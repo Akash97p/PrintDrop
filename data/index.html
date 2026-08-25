@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>PrintDrop — Wireless 3D Print Drive</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<a href="#main" class="skip">Skip to content</a>
+
+<header class="topbar" role="banner">
+  <div class="topbar__inner">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/><path d="M12 11v4"/><path d="M9 14h6"/></svg></span>
+      <span class="brand__text">PrintDrop</span>
+      <span class="brand__badge" id="versionBadge">0.1.0</span>
+    </div>
+    <div class="topbar__actions">
+      <span class="conn" id="connDot" aria-live="polite"><i></i><span id="connText">Connecting…</span></span>
+      <button id="themeToggle" class="btn btn--ghost btn--icon" type="button" aria-label="Toggle colour theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button id="mobileNavToggle" class="btn btn--ghost btn--icon mobile-only" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">☰</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+<nav id="sidebar" class="sidebar" aria-label="Primary">
+  <ul class="nav">
+    <li><button class="nav__btn is-active" data-view="files" aria-current="page"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg> Files</button></li>
+    <li><button class="nav__btn" data-view="upload"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload</button></li>
+    <li><button class="nav__btn" data-view="status"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M7 12v-2"/><path d="M12 12V9"/><path d="M17 12v-4"/></svg> Status</button></li>
+    <li><button class="nav__btn" data-view="settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 1-2 0 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 8.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 1 0-2c.2-.35.48-.64.6-1A1.65 1.65 0 0 0 8.27 9.18l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 12.91 6.6c.35.2.64.48 1 .6a1.65 1.65 0 0 1 2 0c.35-.2.64-.48 1-.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 .6 1 1.65 1.65 0 0 1 0 2c-.2.35-.48.64-.6 1z"/></svg> Settings</button></li>
+    <li><button class="nav__btn" data-view="about"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> About</button></li>
+  </ul>
+  <div class="sidebar__foot">
+    <div class="storage-mini" id="storageMini" aria-live="polite">
+      <div class="storage-mini__head"><span>Storage</span><span id="storageMiniText">—</span></div>
+      <div class="progress progress--sm"><div id="storageMiniBar" class="progress__fill"></div></div>
+    </div>
+  </div>
+</nav>
+
+<main id="main" class="main">
+  <!-- FILES -->
+  <section id="view-files" class="view is-active" aria-labelledby="files-heading">
+    <div class="view__head">
+      <h1 id="files-heading" class="view__title">Files</h1>
+      <div class="view__actions">
+        <div class="seg" role="group" aria-label="View mode">
+          <button id="gridBtn" class="seg__btn is-active" type="button" aria-pressed="true" aria-label="Grid view"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> Grid</button>
+          <button id="listBtn" class="seg__btn" type="button" aria-pressed="false" aria-label="List view"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><polyline points="3 6 3 6 3 6"/><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/></svg> List</button>
+        </div>
+        <label class="select" aria-label="Sort files">
+          <select id="sortSelect">
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="size-desc">Size ↓</option>
+            <option value="size-asc">Size ↑</option>
+          </select>
+        </label>
+        <button id="newFolderBtn" class="btn btn--secondary" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg> New folder</button>
+      </div>
+    </div>
+
+    <nav class="breadcrumb" aria-label="Breadcrumb"><ol id="breadcrumb"></ol></nav>
+
+    <div id="filesEmpty" class="empty hidden">
+      <div class="empty__icon" aria-hidden="true"><svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 12a4 4 0 0 1 4-4h8l4 4h10a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V12z"/><circle cx="24" cy="26" r="6"/><path d="M21 26h6M24 23v6"/></svg></div>
+      <h2>Folder is empty</h2>
+      <p>Drag files anywhere or use Upload to add your first print.</p>
+      <button class="btn btn--primary" type="button" data-view-jump="upload">Go to Upload</button>
+    </div>
+
+    <div id="fileGrid" class="grid"></div>
+    <div id="fileListWrap" class="table-wrap hidden">
+      <table class="table" aria-label="Files">
+        <thead><tr><th scope="col" data-sort="name">Name</th><th scope="col" data-sort="size">Size</th><th scope="col">Type</th><th scope="col" class="th-actions">Actions</th></tr></thead>
+        <tbody id="fileListBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- UPLOAD -->
+  <section id="view-upload" class="view" aria-labelledby="upload-heading">
+    <div class="view__head"><h1 id="upload-heading" class="view__title">Upload</h1></div>
+    <div class="card upload-card">
+      <div class="upload-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <h2>Drop files anywhere</h2>
+      <p class="muted">G-code, STL, 3MF — multiple files queued one at a time (~250 KB/s). Your current folder: <code id="uploadPathLabel">/</code></p>
+      <label class="btn btn--primary btn--lg"><input id="fileInput" type="file" multiple hidden> Choose files</label>
+      <p class="muted muted--sm">Or drag and drop onto this window</p>
+    </div>
+    <div id="uploadQueue" class="queue"></div>
+  </section>
+
+  <!-- STATUS -->
+  <section id="view-status" class="view" aria-labelledby="status-heading">
+    <div class="view__head"><h1 id="status-heading" class="view__title">Status</h1></div>
+    <div class="cards">
+      <div class="card">
+        <h2 class="card__title">Storage</h2>
+        <div id="storageBarWrap">
+          <div class="progress"><div id="storageBar" class="progress__fill"></div></div>
+          <div class="storage-stats"><span id="storageUsed">—</span><span id="storageFree">— free</span><span id="storageTotal">of —</span></div>
+        </div>
+        <p id="cardPresentMsg" class="muted muted--sm"></p>
+      </div>
+      <div class="card">
+        <h2 class="card__title">Device</h2>
+        <dl class="kv">
+          <dt>Hostname</dt><dd id="kvHostname">—</dd>
+          <dt>IP</dt><dd id="kvIp">—</dd>
+          <dt>Wi-Fi</dt><dd id="kvSsid">—</dd>
+          <dt>Signal</dt><dd id="kvRssi">—</dd>
+          <dt>Mode</dt><dd id="kvMode">—</dd>
+          <dt>Uptime</dt><dd id="kvUptime">—</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h2 class="card__title">USB</h2>
+        <p id="usbMsg" class="usb-msg">Checking…</p>
+        <p class="muted muted--sm">If the printer doesn't show a new file, press Eject to force it to re-read the card.</p>
+        <button id="ejectBtn" class="btn btn--secondary" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8 12 12 8 16 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg> Eject / refresh printer view</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view" aria-labelledby="settings-heading">
+    <div class="view__head"><h1 id="settings-heading" class="view__title">Settings</h1></div>
+    <div class="card">
+      <h2 class="card__title">Wi-Fi</h2>
+      <p class="muted muted--sm" style="margin-bottom:10px">Saving reboots the device. It will rejoin on the new network — you may need to reconnect to it.</p>
+      <div class="row" style="margin-bottom:12px">
+        <button id="scanBtn" class="btn btn--secondary" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Scan networks</button>
+        <span id="scanStatus" class="muted muted--sm" aria-live="polite"></span>
+      </div>
+      <div id="scanList" class="scan-list"></div>
+      <form id="wifiForm" class="form">
+        <label>SSID<input name="ssid" id="wifiSsid" required autocomplete="off" placeholder="OfficeWifi"></label>
+        <label>Password<input name="password" id="wifiPass" type="password" autocomplete="new-password" placeholder="••••••••"></label>
+        <label>Hostname<input name="hostname" id="wifiHost" placeholder="printdrop" pattern="[a-zA-Z0-9\-]+"></label>
+        <label class="check"><input type="checkbox" id="useStatic" name="useStatic"> Use static IP</label>
+        <div id="staticFields" class="grid2 hidden">
+          <label>IP<input name="ip" placeholder="192.168.1.50"></label>
+          <label>Gateway<input name="gw" placeholder="192.168.1.1"></label>
+          <label>Subnet mask<input name="mask" placeholder="255.255.255.0"></label>
+          <label>DNS<input name="dns" placeholder="1.1.1.1"></label>
+        </div>
+        <button class="btn btn--primary" type="submit">Save &amp; reboot</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="view-about" class="view" aria-labelledby="about-heading">
+    <div class="view__head"><h1 id="about-heading" class="view__title">About</h1></div>
+    <div class="card about">
+      <div class="about__mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/><path d="M12 11v4"/><path d="M9 14h6"/></svg></div>
+      <h2 class="about__name">PrintDrop <span id="aboutVersion" class="about__ver">0.1.0</span></h2>
+      <p>PrintDrop is a tiny ESP32-S3 bridge that exposes its SD card as a USB flash drive to your 3D printer while serving a fast, cable-free web UI over Wi-Fi — so you can drop a <code>.gcode</code> from your desk and print without ever walking a stick to the machine.</p>
+      <p class="credit">Made by Akash P | CTO, <a href="https://kabanitech.com" target="_blank" rel="noopener">Kabani Tech Private Limited</a></p>
+    </div>
+  </section>
+</main>
+</div>
+
+<div id="dropOverlay" class="drop-overlay hidden" aria-hidden="true">
+  <div class="drop-overlay__box"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><p>Drop to upload</p><span class="muted muted--sm" id="dropPathLabel">to /</span></div>
+</div>
+
+<div id="toastWrap" class="toast-wrap" aria-live="polite" aria-relevant="additions"></div>
+
+<!-- Modal -->
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__box">
+    <h2 id="modalTitle" class="modal__title"></h2>
+    <p id="modalMsg" class="muted"></p>
+    <label id="modalInputWrap" class="hidden"><input id="modalInput" type="text"></label>
+    <div class="modal__actions">
+      <button id="modalCancel" class="btn btn--ghost" type="button">Cancel</button>
+      <button id="modalOk" class="btn btn--primary" type="button">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

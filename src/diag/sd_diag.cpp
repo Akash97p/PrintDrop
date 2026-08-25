@@ -6,7 +6,7 @@
 #include <SD.h>
 #include <esp_chip_info.h>
 #include <esp_flash.h>
-#include "reflash_hatch.h"
+#include "../common/reflash_hatch.h"
 
 #ifndef SD_CS_PIN
 #define SD_CS_PIN   12

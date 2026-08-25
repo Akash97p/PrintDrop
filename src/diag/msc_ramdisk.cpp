@@ -8,7 +8,7 @@
 #include <Arduino.h>
 #include <USB.h>
 #include <USBMSC.h>
-#include "reflash_hatch.h"
+#include "../common/reflash_hatch.h"
 
 static const uint16_t kSectorSize  = 512;
 static const uint16_t kSectorCount = 192;   // 96 KB volume

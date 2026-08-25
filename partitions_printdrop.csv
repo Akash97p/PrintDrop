@@ -1,0 +1,11 @@
+# PrintDrop partition table for a 4 MB ESP32-S3.
+#
+# The stock esp32-s3-devkitc-1 definition assumes 8 MB, which places partitions
+# past the end of this chip. Single app image (no OTA slot, there is no room for
+# two on 4 MB) plus a LittleFS volume holding the web UI.
+#
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+app0,       app,  factory,  0x10000,  0x2A0000,
+spiffs,     data, spiffs,   0x2B0000, 0x140000,
+coredump,   data, coredump, 0x3F0000, 0x10000,

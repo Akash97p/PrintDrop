@@ -7,7 +7,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <SD.h>
-#include "reflash_hatch.h"
+#include "../common/reflash_hatch.h"
 
 #ifndef SD_CS_PIN
 #define SD_CS_PIN   12

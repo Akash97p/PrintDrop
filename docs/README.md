@@ -14,6 +14,20 @@ Reference and background for the firmware. Start with the
 `platformio.ini.original` is the upstream Cardputer build configuration, kept
 for reference against the current one.
 
+## Branding assets
+
+| File | Used by | Notes |
+|---|---|---|
+| `assets/printdrop_logo.webp` | source of truth | Full lockup, 1536×1024, transparent |
+| `assets/printdrop_banner.webp` | README, site hero | Lockup on a dark ground, 1200 px wide |
+| `data/logo.webp` | web UI, site favicon | Icon only, 256×256, flashed to the device |
+
+The wordmark sets "Print" in white, so the full lockup **needs a dark
+background** — on white, half of it disappears. That is why the banner is
+pre-flattened onto the brand navy and why the site commits to a dark theme. The
+square icon carries its own dark tile, so it is safe on any background and is
+the one used in the UI.
+
 ## Why these notes exist
 
 The port from an M5Stack Cardputer to a bare ESP32-S3-DevKitC-1 turned up

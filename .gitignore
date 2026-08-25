@@ -13,3 +13,6 @@
 # Local secrets / device-specific config
 secrets.h
 wifi_credentials.h
+
+# GitHub Pages build output
+_site/

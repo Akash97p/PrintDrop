@@ -11,6 +11,9 @@ Drop a print job from your desk instead of walking a USB stick to the machine.
 [![USB](https://img.shields.io/badge/USB-TinyUSB%20MSC-336791)](https://github.com/hathach/tinyusb)
 [![UI](https://img.shields.io/badge/UI-LittleFS%20hosted-4B32C3)](data/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-working%20on%20hardware-brightgreen)](ox-alpha/FINDINGS.md)
+[![Issues](https://img.shields.io/github/issues/Akash97p/PrintDrop)](https://github.com/Akash97p/PrintDrop/issues)
+[![Last commit](https://img.shields.io/github/last-commit/Akash97p/PrintDrop)](https://github.com/Akash97p/PrintDrop/commits)
 
 </div>
 
@@ -24,6 +27,10 @@ print.
 
 Built for printers that only accept USB media and have no networking of their
 own.
+
+Working on hardware: the card enumerates as a USB drive, the web UI serves from
+LittleFS, and files uploaded over Wi-Fi appear to the USB host without a
+reboot.
 
 | Measurement | Value |
 |---|---|
@@ -198,6 +205,13 @@ error message:
 - **SD cards must be identified at ≤400 kHz** before the clock is raised.
 
 Full investigation notes: [`ox-alpha/FINDINGS.md`](ox-alpha/FINDINGS.md).
+
+## Contributing
+
+Build instructions, the branch model, and the hardware traps worth knowing about
+are in [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports are most useful with the
+UART0 boot log and, for card problems, the output of the `diag` or `scan`
+environment.
 
 ## Credits
 

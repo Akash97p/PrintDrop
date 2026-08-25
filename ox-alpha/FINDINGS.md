@@ -4,7 +4,7 @@ Porting `Esp32-USB-Stick` from an **M5Stack Cardputer** to a bare
 **ESP32-S3-DevKitC-1**, and getting the SD card to enumerate as a USB drive.
 
 Working directory is accessed from WSL; all flashing and serial work goes
-through the Windows PlatformIO install (`C:\Users\Akash\.platformio`), because
+through the Windows PlatformIO install (`%USERPROFILE%\.platformio`), because
 the serial ports are Windows COM ports.
 
 ---
@@ -18,7 +18,7 @@ Read off the chip with `esptool.py flash_id`, not from the board silkscreen:
 | Chip | ESP32-S3, revision **v0.2** |
 | Flash | **4 MB**, quad (QIO), manufacturer `0xC8` (GigaDevice), device `0x4016` |
 | PSRAM | **none** (`ESP.getPsramSize()` = 0; esptool reports only WiFi/BLE) |
-| MAC | `98:88:E0:9D:12:30` |
+| MAC | `98:88:E0:xx:xx:xx` |
 | Arduino core | 2.0.11 (`framework-arduinoespressif32` 3.20011.230801), IDF v4.4.5 |
 | PlatformIO platform | espressif32 6.4.0 |
 

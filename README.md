@@ -11,7 +11,7 @@ Drop a print job from your desk instead of walking a USB stick to the machine.
 [![USB](https://img.shields.io/badge/USB-TinyUSB%20MSC-336791)](https://github.com/hathach/tinyusb)
 [![UI](https://img.shields.io/badge/UI-LittleFS%20hosted-4B32C3)](data/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-working%20on%20hardware-brightgreen)](ox-alpha/FINDINGS.md)
+[![Status](https://img.shields.io/badge/status-working%20on%20hardware-brightgreen)](docs/)
 [![Issues](https://img.shields.io/github/issues/Akash97p/PrintDrop)](https://github.com/Akash97p/PrintDrop/issues)
 [![Last commit](https://img.shields.io/github/last-commit/Akash97p/PrintDrop)](https://github.com/Akash97p/PrintDrop/commits)
 
@@ -60,6 +60,8 @@ ESP32's own FATFS cache goes stale if the host writes sectors underneath it.
 
 MSC callbacks take the mutex with a short timeout and fail the transfer rather
 than stall the USB task, so a slow Wi-Fi upload can never hang the printer.
+
+The full design is in [`docs/architecture.md`](docs/architecture.md).
 
 ## Hardware
 
@@ -176,7 +178,7 @@ src/diag/         SD and USB diagnostics
 src/legacy/       USB mass storage only
 src/common/       shared helpers
 data/             web UI, flashed to LittleFS
-ox-alpha/         investigation notes
+docs/             architecture, hardware, bugs, flashing notes
 ```
 
 ## Partitions
@@ -204,7 +206,16 @@ error message:
   freezing the USB descriptor before the sketch can add its MSC interface.
 - **SD cards must be identified at ≤400 kHz** before the clock is raised.
 
-Full investigation notes: [`ox-alpha/FINDINGS.md`](ox-alpha/FINDINGS.md).
+These and the rest of the investigation are written up in [`docs/bugs.md`](docs/bugs.md).
+
+## Documentation
+
+| | |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | How the pieces fit: USB/Wi-Fi arbitration, module layout, partitions, performance |
+| [docs/hardware.md](docs/hardware.md) | The board as measured, wiring, power requirements, verified SPI clocks |
+| [docs/bugs.md](docs/bugs.md) | Every fault found during the port and its root cause |
+| [docs/flashing.md](docs/flashing.md) | Getting this board into download mode |
 
 ## Contributing
 

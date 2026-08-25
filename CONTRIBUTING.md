@@ -42,7 +42,7 @@ src/diag/         SD and USB diagnostics
 src/legacy/       USB mass storage only, no networking
 src/common/       shared helpers
 data/             web UI, flashed to LittleFS
-ox-alpha/         investigation notes
+docs/             architecture, hardware, bugs, flashing notes
 ```
 
 ## Branches and commits
@@ -71,7 +71,8 @@ topic branch.
 ## Things that will catch you out
 
 These are documented because each one cost real debugging time, and none of
-them produce a useful error message.
+them produce a useful error message. Longer write-ups with the supporting
+evidence are in [docs/bugs.md](docs/bugs.md).
 
 **`ARDUINO_USB_MODE` must be `0`.** The stock `esp32-s3-devkitc-1` board
 definition hard-codes `1`, which puts the native port on the hardware
@@ -113,7 +114,8 @@ above 3.3 V — outside the SoC's absolute maximum of VDD + 0.3 V.
 
 ## Touching the storage layer
 
-`src/printdrop/storage.cpp` is the part to be careful with. A USB host caches
+`src/printdrop/storage.cpp` is the part to be careful with — read
+[docs/architecture.md](docs/architecture.md#sharing-the-card) first. A USB host caches
 the FAT, so writing to the card behind its back corrupts the filesystem. Three
 rules hold it together:
 

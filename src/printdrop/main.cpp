@@ -1,4 +1,4 @@
-// PrintDrop — a Wi-Fi SD card for 3D printers.
+// PrintDrop — a Wi-Fi flash drive for 3D printers.
 //
 // The board plugs into a printer's USB port and appears as an ordinary USB
 // flash drive. It also joins the local network and serves a web UI, so print

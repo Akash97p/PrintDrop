@@ -1,0 +1,151 @@
+/* PrintDrop site.
+   Committed to a single dark world: the logo's wordmark sets "Print" in white,
+   so a light ground would erase half the mark. Every colour is painted
+   explicitly rather than inherited. */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@500&display=swap');
+
+:root{
+  --ground:#060D1A;        /* page ground, matches the banner artwork */
+  --panel:#0C1526;         /* raised surface */
+  --panel-2:#111C31;       /* hover / nested surface */
+  --line:#1E2C45;          /* hairlines */
+  --ink:#E8EEF9;           /* primary text */
+  --ink-dim:#93A4C0;       /* secondary text */
+  --blue:#2B8FFF;          /* the wordmark blue */
+  --cyan:#44DFFF;          /* the Wi-Fi arcs */
+  --ember:#F59E0B;         /* printer nozzle accent, used once */
+
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+
+  --wrap:1080px;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+.wrap{width:100%;max-width:var(--wrap);margin-inline:auto;padding-inline:24px}
+
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:16px;top:16px;z-index:10;background:var(--blue);color:#00122B;
+  padding:10px 16px;border-radius:8px;font-weight:600}
+
+a{color:var(--blue);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{color:var(--cyan)}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:4px}
+
+code{font-family:var(--mono);font-size:.9em;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:5px;padding:.1em .4em;color:var(--cyan)}
+
+/* ---- hero ---- */
+.hero{
+  padding:88px 0 72px;
+  text-align:center;
+  /* A single wash of brand blue behind the mark, fading into the ground. */
+  background:
+    radial-gradient(80% 120% at 50% 0%, rgba(43,143,255,.16) 0%, rgba(6,13,26,0) 62%),
+    var(--ground);
+  border-bottom:1px solid var(--line);
+}
+.hero__logo{width:min(560px,86vw);height:auto;display:block;margin:0 auto 28px}
+.hero__tagline{
+  font-family:var(--display);font-weight:800;
+  font-size:clamp(1.6rem,4.2vw,2.5rem);line-height:1.15;
+  margin:0 0 14px;text-wrap:balance;color:var(--ink);
+}
+.hero__sub{margin:0 auto;max-width:56ch;color:var(--ink-dim);text-wrap:balance}
+.hero__actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:32px}
+
+.btn{
+  display:inline-block;padding:12px 22px;border-radius:10px;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  font-weight:600;text-decoration:none;
+  transition:background 160ms ease,border-color 160ms ease,transform 160ms ease;
+}
+.btn:hover{background:var(--panel-2);border-color:var(--blue);color:var(--ink);transform:translateY(-1px)}
+.btn--primary{background:var(--blue);border-color:var(--blue);color:#00122B}
+.btn--primary:hover{background:var(--cyan);border-color:var(--cyan);color:#00122B}
+
+/* ---- sections ---- */
+.section{padding:64px 0;border-bottom:1px solid var(--line)}
+.section:last-of-type{border-bottom:0}
+
+h2{
+  font-family:var(--display);font-weight:700;
+  font-size:clamp(1.35rem,2.6vw,1.85rem);line-height:1.2;
+  margin:0 0 20px;letter-spacing:-.01em;text-wrap:balance;
+}
+h3{font-family:var(--display);font-weight:700;font-size:1.05rem;margin:0 0 6px;letter-spacing:-.005em}
+p{margin:0 0 16px;max-width:68ch}
+.lede{font-size:1.1rem;color:var(--ink)}
+.note{color:var(--ink-dim);font-size:.95rem}
+
+/* ---- steps: a real sequence, so numbered ---- */
+.steps{list-style:none;counter-reset:step;margin:0;padding:0;
+  display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.steps li{counter-increment:step;position:relative;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 22px 20px}
+.steps li::before{
+  content:counter(step,decimal-leading-zero);
+  font-family:var(--mono);font-size:.78rem;color:var(--blue);
+  display:block;margin-bottom:12px;letter-spacing:.08em;
+}
+.steps p{margin:0;color:var(--ink-dim);font-size:.96rem}
+
+/* ---- cards ---- */
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+.card p{margin:0;color:var(--ink-dim);font-size:.96rem}
+
+/* ---- rules list ---- */
+.rules{margin:0 0 18px;padding:0;list-style:none;display:grid;gap:10px;max-width:68ch}
+.rules li{
+  background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--blue);border-radius:0 10px 10px 0;
+  padding:14px 18px;color:var(--ink-dim);font-size:.97rem;
+}
+.rules strong{color:var(--ink)}
+
+/* ---- stats ---- */
+.stats{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:20px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:22px 18px;text-align:center}
+.stat__n{display:block;font-family:var(--display);font-weight:800;font-size:2.1rem;
+  line-height:1;color:var(--cyan);font-variant-numeric:tabular-nums}
+.stat__u{display:block;margin-top:8px;font-size:.82rem;color:var(--ink-dim);
+  text-transform:uppercase;letter-spacing:.07em}
+
+/* ---- doc links ---- */
+.links{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.links a{
+  display:block;padding:18px 20px;border-radius:12px;text-decoration:none;
+  background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  transition:background 160ms ease,border-color 160ms ease,transform 160ms ease;
+}
+.links a:hover{background:var(--panel-2);border-color:var(--blue);transform:translateY(-1px)}
+.links strong{display:block;font-family:var(--display);font-weight:700;margin-bottom:3px}
+.links span{display:block;color:var(--ink-dim);font-size:.9rem;line-height:1.45}
+
+/* ---- footer ---- */
+.footer{padding:40px 0 56px;border-top:1px solid var(--line);background:var(--panel)}
+.footer p{margin:0 0 6px;max-width:none}
+.footer__meta{color:var(--ink-dim);font-size:.9rem}
+
+/* The ember accent earns exactly one appearance, on the footer rule. */
+.footer{box-shadow:inset 0 3px 0 -2px var(--ember)}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important;animation:none !important}
+  .btn:hover,.links a:hover{transform:none}
+}

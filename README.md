@@ -1,8 +1,8 @@
 <div align="center">
 
-# PrintDrop
+<img src="assets/printdrop_banner.webp" alt="PrintDrop" width="620">
 
-**A Wi-Fi SD card for 3D printers.**
+**A Wi-Fi flash drive for 3D printers.**
 Drop a print job from your desk instead of walking a USB stick to the machine.
 
 [![Platform](https://img.shields.io/badge/platform-ESP32--S3-E7352C?logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
@@ -22,8 +22,11 @@ Drop a print job from your desk instead of walking a USB stick to the machine.
 PrintDrop plugs into a 3D printer's USB port and appears as an ordinary USB
 flash drive — no printer firmware changes, no cloud service, no vendor account.
 At the same time it joins the local network and serves a web UI, so anyone can
-drag a `.gcode` file onto the card from their desk and then walk over and press
-print.
+drag a `.gcode` file onto it from their desk and then walk over and press print.
+
+It is a **flash drive that happens to be reachable over Wi-Fi**. The printer
+sees nothing unusual: a USB mass storage device with a FAT32 volume. An SD card
+is simply the storage medium behind it.
 
 Built for printers that only accept USB media and have no networking of their
 own.
@@ -179,6 +182,8 @@ src/legacy/       USB mass storage only
 src/common/       shared helpers
 data/             web UI, flashed to LittleFS
 docs/             architecture, hardware, bugs, flashing notes
+assets/           branding
+site/             GitHub Pages source
 ```
 
 ## Partitions

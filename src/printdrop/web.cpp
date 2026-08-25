@@ -97,6 +97,7 @@ const char* contentTypeFor(const String& path) {
     if (path.endsWith(".svg"))  return "image/svg+xml";
     if (path.endsWith(".ico"))  return "image/x-icon";
     if (path.endsWith(".png"))  return "image/png";
+    if (path.endsWith(".webp")) return "image/webp";
     if (path.endsWith(".woff2"))return "font/woff2";
     return "text/plain";
 }

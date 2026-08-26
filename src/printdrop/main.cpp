@@ -60,6 +60,7 @@ static void handleCommand(String line) {
         Serial.printf("ip        : %s\n", net::localIp().toString().c_str());
         Serial.printf("rssi      : %d dBm\n", (int)net::rssi());
         Serial.printf("card      : %s\n", storage::cardMounted() ? "mounted" : "absent");
+        Serial.printf("sd bus    : %s %u-bit @ %u Hz\n", storage::busMode(), storage::busWidth(), storage::busFrequency());
         Serial.printf("usb host  : %s\n", storage::usbHostPresent() ? "connected" : "none");
         Serial.printf("usb media : %s\n", storage::usbMediaPresent() ? "presented" : "withdrawn");
 
@@ -112,8 +113,14 @@ static void banner() {
     Serial.println("  Kabani Tech Private Limited");
     Serial.println("=====================================");
     Serial.printf("Build: %s %s\n", __DATE__, __TIME__);
+#ifdef USE_SDIO
+    Serial.printf("SD bus: SDIO %d-bit CLK=%d CMD=%d D0=%d D1=%d D2=%d D3=%d @ %u Hz\n",
+                  SDMMC_WIDTH, SDMMC_CLK_PIN, SDMMC_CMD_PIN, SDMMC_D0_PIN,
+                  SDMMC_D1_PIN, SDMMC_D2_PIN, SDMMC_D3_PIN, SDMMC_FREQ);
+#else
     Serial.printf("SD pins CS=%d MISO=%d MOSI=%d CLK=%d\n",
                   SD_CS_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CLK_PIN);
+#endif
     Serial.println("Type 'help' for serial commands.");
 }
 

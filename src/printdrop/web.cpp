@@ -3,7 +3,13 @@
 #include <Arduino.h>
 #include <WebServer.h>
 #include <LittleFS.h>
+#ifdef USE_SDIO
+#include <SD_MMC.h>
+#define SD_FS SD_MMC
+#else
 #include <SD.h>
+#define SD_FS SD
+#endif
 #include <WiFi.h>
 
 #include "config.h"
@@ -156,7 +162,11 @@ void handleStatus() {
     j +=   "\"totalBytes\":" + String(total) + ",";
     j +=   "\"usedBytes\":" + String(used) + ",";
     j +=   "\"freeBytes\":" + String(freeB) + ",";
-    j +=   "\"spiHz\":" + String(storage::spiFrequency());
+    // spiHz kept for backwards compatibility; bus* is canonical on feat/sdio.
+    j +=   "\"spiHz\":" + String(storage::spiFrequency()) + ",";
+    j +=   "\"busHz\":" + String(storage::busFrequency()) + ",";
+    j +=   "\"busMode\":\"" + String(storage::busMode()) + "\",";
+    j +=   "\"busWidth\":" + String(storage::busWidth());
     j += "},";
     j += "\"usb\":{";
     j +=   "\"hostPresent\":" + String(storage::usbHostPresent() ? "true" : "false") + ",";
@@ -176,7 +186,7 @@ void handleList() {
     storage::Guard g(false);
     if (!g.ok()) return sendError(503, "Card busy");
 
-    File dir = SD.open(path);
+    File dir = SD_FS.open(path);
     if (!dir) return sendError(404, "No such folder");
     if (!dir.isDirectory()) { dir.close(); return sendError(400, "Not a folder"); }
 
@@ -202,9 +212,9 @@ void handleList() {
 // --- API: mutations --------------------------------------------------------
 
 void removeRecursive(const String& path) {
-    File f = SD.open(path);
+    File f = SD_FS.open(path);
     if (!f) return;
-    if (!f.isDirectory()) { f.close(); SD.remove(path); return; }
+    if (!f.isDirectory()) { f.close(); SD_FS.remove(path); return; }
     for (File child = f.openNextFile(); child; child = f.openNextFile()) {
         String name = child.name();
         const int slash = name.lastIndexOf('/');
@@ -212,10 +222,10 @@ void removeRecursive(const String& path) {
         const bool isDir = child.isDirectory();
         child.close();
         if (isDir) removeRecursive(joinPath(path, name));
-        else       SD.remove(joinPath(path, name));
+        else       SD_FS.remove(joinPath(path, name));
     }
     f.close();
-    SD.rmdir(path);
+    SD_FS.rmdir(path);
 }
 
 void handleDelete() {
@@ -225,10 +235,10 @@ void handleDelete() {
 
     storage::Guard g(true);
     if (!g.ok()) return sendError(503, "Card busy");
-    if (!SD.exists(path)) return sendError(404, "No such file");
+    if (!SD_FS.exists(path)) return sendError(404, "No such file");
 
     removeRecursive(path);
-    if (SD.exists(path)) return sendError(500, "Delete failed");
+    if (SD_FS.exists(path)) return sendError(500, "Delete failed");
     log("[web] deleted %s", path.c_str());
     sendOk();
 }
@@ -240,8 +250,8 @@ void handleMkdir() {
 
     storage::Guard g(true);
     if (!g.ok()) return sendError(503, "Card busy");
-    if (SD.exists(path)) return sendError(409, "Already exists");
-    if (!SD.mkdir(path)) return sendError(500, "Could not create folder");
+    if (SD_FS.exists(path)) return sendError(409, "Already exists");
+    if (!SD_FS.mkdir(path)) return sendError(500, "Could not create folder");
     sendOk();
 }
 
@@ -254,9 +264,9 @@ void handleRename() {
 
     storage::Guard g(true);
     if (!g.ok()) return sendError(503, "Card busy");
-    if (!SD.exists(from)) return sendError(404, "No such file");
-    if (SD.exists(to))    return sendError(409, "Target already exists");
-    if (!SD.rename(from, to)) return sendError(500, "Rename failed");
+    if (!SD_FS.exists(from)) return sendError(404, "No such file");
+    if (SD_FS.exists(to))    return sendError(409, "Target already exists");
+    if (!SD_FS.rename(from, to)) return sendError(500, "Rename failed");
     sendOk();
 }
 
@@ -267,7 +277,7 @@ void handleDownload() {
     storage::Guard g(false, 20000);
     if (!g.ok()) return sendError(503, "Card busy");
 
-    File f = SD.open(path, FILE_READ);
+    File f = SD_FS.open(path, FILE_READ);
     if (!f) return sendError(404, "No such file");
     if (f.isDirectory()) { f.close(); return sendError(400, "Is a folder"); }
 
@@ -305,8 +315,8 @@ void handleUploadData() {
         if (!storage::lock(true, 20000)) { uploadError = "Card busy"; return; }
         uploadHoldsLock = true;
 
-        if (SD.exists(uploadName)) SD.remove(uploadName);
-        uploadFile = SD.open(uploadName, FILE_WRITE);
+        if (SD_FS.exists(uploadName)) SD_FS.remove(uploadName);
+        uploadFile = SD_FS.open(uploadName, FILE_WRITE);
         if (!uploadFile) {
             uploadError = "Could not open file for writing";
             storage::unlock();
@@ -332,7 +342,7 @@ void handleUploadData() {
     } else if (up.status == UPLOAD_FILE_ABORTED) {
         if (uploadFile) uploadFile.close();
         // Do not leave a truncated file that looks like a valid print job.
-        if (!uploadName.isEmpty() && SD.exists(uploadName)) SD.remove(uploadName);
+        if (!uploadName.isEmpty() && SD_FS.exists(uploadName)) SD_FS.remove(uploadName);
         if (uploadHoldsLock) { storage::unlock(); uploadHoldsLock = false; }
         uploadError = "Upload aborted";
     }

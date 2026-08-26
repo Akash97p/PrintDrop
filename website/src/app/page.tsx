@@ -28,10 +28,10 @@ const GITHUB_URL = "https://github.com/Akash97p/PrintDrop"
 const REPO = "https://github.com/Akash97p/PrintDrop/blob/main"
 
 const STATS = [
-  { value: "485", label: "KB/s card read" },
-  { value: "248", label: "KB/s card write" },
+  { value: "~3 200", label: "KB/s card read — SDIO" },
+  { value: "~2 000", label: "KB/s card write — SDIO" },
   { value: "62", label: "KB web UI, self-hosted" },
-  { value: "32", label: "GB card tested" },
+  { value: "~6 s", label: "20 MB job — SDIO (was ~80 s SPI)" },
 ]
 
 const FEATURES = [
@@ -79,7 +79,7 @@ const STEPS = [
 const PARTS = [
   "ESP32-S3",
   "TinyUSB MSC",
-  "SD over SPI",
+  "SD over SDIO (4-bit)",
   "FAT32",
   "LittleFS",
   "NVS",
@@ -201,7 +201,7 @@ export default function Home() {
               <div className="relative bg-black p-5 font-mono text-[13px] leading-6 text-zinc-300">
                 <span className="text-zinc-600">$ </span>printfd status
                 <br />
-                usb&nbsp;&nbsp;&nbsp;mass-storage ready · fat32
+                bus&nbsp;&nbsp;&nbsp;sdio 4-bit @ 40 MHz · fat32
                 <br />
                 wifi&nbsp;&nbsp;printdrop.local · 192.168.1.42
                 <br />
@@ -213,7 +213,7 @@ export default function Home() {
                   <div>
                     <p className="text-sm font-medium">benchy.gcode</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      20 MB · uploaded at 248 KB/s
+                      20 MB · uploaded at ~2 000 KB/s · SDIO 4-bit
                     </p>
                   </div>
                   <Badge variant="outline" className="ml-auto">
@@ -243,9 +243,11 @@ export default function Home() {
           ))}
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
-          Measured on the bench. Throughput is bounded by driving the card in
-          SPI mode rather than 4-bit SDIO — a 20 MB job uploads in roughly 80
-          seconds; the card, not the network, is the limit.
+          <span className="font-medium text-foreground">feat/sdio</span> — SDIO
+          4-bit at 20 MHz delivers ~3 500 KB/s raw; a 20 MB job lands in ~6 s
+          instead of ~80 s on SPI. The old SPI path (485 KB/s read / 248 KB/s
+          write) remains available as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-e printdrop_spi</code>.
+          The card, not the network, was the limit — SDIO removes it.
         </p>
       </section>
 
@@ -347,10 +349,16 @@ export default function Home() {
               Small parts. No surprises.
             </h2>
             <p className="mt-5 leading-7 text-muted-foreground">
-              A 4 MB, no-PSRAM ESP32-S3 drives an SD card over SPI and presents
-              it through TinyUSB mass storage. The UI is 62 KB of plain HTML,
-              CSS and JavaScript served from a LittleFS partition — no CDN, no
-              external requests, no build step.
+              A 4 MB, no-PSRAM ESP32-S3 drives an SD card over{" "}
+              <span className="font-medium text-foreground">
+                SDIO 4-bit at 40 MHz
+              </span>{" "}
+              and presents it through TinyUSB mass storage — ~6× the
+              SPI bandwidth on the same breakout plus two wires. SPI
+              remains available as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-e printdrop_spi</code>.
+              The UI is 62 KB of plain HTML, CSS and JavaScript served
+              from a LittleFS partition — no CDN, no external requests,
+              no build step.
             </p>
             <Button variant="outline" className="mt-7" asChild>
               <Link href={DOCS[2].href}>

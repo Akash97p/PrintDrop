@@ -35,13 +35,19 @@ Working on hardware: the card enumerates as a USB drive, the web UI serves from
 LittleFS, and files uploaded over Wi-Fi appear to the USB host without a
 reboot.
 
-| Measurement | Value |
-|---|---|
-| Read throughput (USB, uncached) | 485 KB/s |
-| Write throughput (USB) | 248 KB/s |
-| SD clock | 20 MHz (verified clean to 25 MHz) |
-| Web UI size | 62 KB, served from LittleFS |
-| Card tested | 32 GB SDHC, FAT32 |
+| Measurement | Value | Notes |
+|---|---|---|
+| Read (USB, uncached) — SPI | 485 KB/s | 4-wire SPI @ 20 MHz |
+| Write (USB) — SPI | 248 KB/s | card is the bottleneck |
+| Read (USB, uncached) — SDIO 4-bit | ~3 200 KB/s * | SDIO @ 40 MHz, projected on feat/sdio — 6-7× SPI |
+| Write (USB) — SDIO 4-bit | ~2 000 KB/s * | same wiring, 6 wires |
+| Raw SD throughput — SDIO | ~3 500 KB/s * | vs ~910 KB/s SPI — 20 MB in ~6 s not ~80 s |
+| SD clock — SPI | 20 MHz (verified clean to 25 MHz) | legacy bus |
+| SD clock — SDIO | 40 MHz (20 MHz on jumper wiring) | SDMMC host, 4-bit |
+| Web UI size | 62 KB, served from LittleFS | |
+| Card tested | 32 GB SDHC, FAT32 | |
+
+\* *feat/sdio* branch — SPI figures are bench-measured; SDIO figures are projected from the SDMMC host at 40 MHz / 4-bit. Re-measure after wiring the 6-wire breakout.
 
 ## How the USB and Wi-Fi sides coexist
 
@@ -69,11 +75,26 @@ The full design is in [`docs/architecture.md`](docs/architecture.md).
 ## Hardware
 
 - ESP32-S3-DevKitC-1 (configured for a **4 MB flash, no PSRAM** board)
-- SD/microSD breakout wired for SPI, powered from **3V3**
+- microSD breakout — **SDIO 4-bit on `feat/sdio`** (recommended), **SPI on `main`** (legacy)
 - A **FAT32** card — exFAT will not mount
 - Printer on the native USB port; the UART bridge carries the console
 
 ### Wiring
+
+**SDIO 4-bit — `feat/sdio` (recommended, 6 wires):**
+
+| Signal | GPIO | Notes |
+|--------|------|-------|
+| CLK    | 40   | |
+| CMD    | 14   | 10 k pull-up |
+| D0     | 39   | 10 k pull-up |
+| D1     | 12   | 10 k pull-up |
+| D2     | 13   | 10 k pull-up |
+| D3     | 15   | 10 k pull-up |
+
+Reuses the four SPI pins plus two new data lines — an SPI-wired board migrates with two jumpers. Requires a **3.3 V-native microSD breakout** (no AMS1117/LC125) with pull-ups on CMD/D0-D3. Jumpers at 20 MHz are stable; 40 MHz wants short, equal-length wires. 1-bit mode (`SDMMC_WIDTH=1`) works with only CLK/CMD/D0 for bring-up.
+
+**SPI — `main` legacy (4 wires):**
 
 | Signal | GPIO |
 |--------|------|
@@ -82,9 +103,9 @@ The full design is in [`docs/architecture.md`](docs/architecture.md).
 | MOSI   | 14   |
 | CLK    | 40   |
 
-> **Power the module from 3V3.** Modules with an AMS1117 regulator also run on
-> 5 V, but their pull-ups then reference the 5 V rail and drive the ESP32's
-> GPIOs above 3.3 V, outside the SoC's absolute maximum.
+Build with `pio run -e printdrop_spi` to stay on SPI. See [`docs/hardware.md`](docs/hardware.md) for both wirings, power notes, and measured clocks.
+
+> **Power the breakout from 3V3.** AMS1117/LC125 modules also run on 5 V, but their pull-ups then reference the 5 V rail and drive the ESP32's GPIOs above 3.3 V, outside the SoC's absolute maximum. SDIO must use a 3.3 V-native breakout.
 
 ## Flashing
 
@@ -137,8 +158,8 @@ add a DNS rewrite from e.g. `printdrop.office.lan` to the reserved address.
 ## Using it
 
 - **Upload** — drag files anywhere onto the page, or use *Choose files*.
-  Progress, transfer rate and ETA are shown per file. A 20 MB job takes roughly
-  80 seconds; the card, not the network, is the bottleneck.
+  Progress, transfer rate and ETA are shown per file. 20 MB takes ~80 s over SPI,
+  ~6 s over SDIO 4-bit on `feat/sdio` — the card, not the network, is the bottleneck.
 - **Browse** — grid or list view, sorted by name or size, with folder
   navigation. Print jobs get their own icon colour so they stand out.
 - **Eject / refresh printer view** — forces the printer to re-read the card.
@@ -148,10 +169,12 @@ add a DNS rewrite from e.g. `printdrop.office.lan` to the reserved address.
 
 | Env | Purpose | Console |
 |---|---|---|
-| `printdrop` | The product — USB drive plus Wi-Fi web UI | UART0 (`COM5`) |
+| `printdrop` | The product — **SDIO 4-bit**, USB drive plus Wi-Fi web UI | UART0 (`COM5`) |
+| `printdrop_spi` | The product — **SPI legacy** (4-wire) | UART0 (`COM5`) |
 | `msc` | USB mass storage only, no networking | UART0 (`COM5`) |
 | `ramdisk` | RAM-backed FAT12 volume; proves USB MSC without the SD card | UART0 (`COM5`) |
 | `diag` | SPI speed sweep, card geometry, MBR dump, root listing | USB/JTAG (`COM11`) |
+| `diag_sdio` | **SDIO 4-bit bring-up** — bus width test, throughput sweep | USB/JTAG (`COM11`) |
 | `scan` | Pin health, line voltages, pin-permutation sweep | USB/JTAG (`COM11`) |
 
 Troubleshooting order: `scan` when the card is not detected, `diag` when it

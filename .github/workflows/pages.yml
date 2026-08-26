@@ -2,7 +2,9 @@ name: Documentation site
 
 on:
   push:
-    branches: [main]
+    # Validate the site on feature branches (feat/sdio) without deploying;
+    # deploy only happens from main (see deploy job condition).
+    branches: [main, "feat/**", "feature/**"]
     paths:
       - "website/**"
       - "assets/printdrop_banner.webp"
@@ -44,6 +46,8 @@ jobs:
           path: _site
 
   deploy:
+    # Only the main branch publishes to Pages; feature branches just validate.
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

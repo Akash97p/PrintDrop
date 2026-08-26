@@ -1,0 +1,9 @@
+# pnpm 11 reads settings from this file rather than package.json.
+#
+# sharp is an optional peer of next (used by the image optimizer, which a
+# static export never runs) but still lands in the tree. strictDepBuilds
+# defaults to true in pnpm 11, so its postinstall script must be approved
+# explicitly or every CI install fails with ERR_PNPM_IGNORED_BUILDS.
+autoInstallPeers: false
+allowBuilds:
+  sharp: true

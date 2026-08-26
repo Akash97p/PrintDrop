@@ -1,26 +1,32 @@
 #!/usr/bin/env bash
-# Assemble the GitHub Pages site into _site/.
+# Build the GitHub Pages site (website/ — a Next.js static export) into _site/.
 #
-# The site is plain static files. This script exists so the branding assets stay
-# in one place: the banner lives in assets/ (it is also the README header) and
-# the icon lives in data/ (it is also flashed to the device), and both are
-# copied in here rather than duplicated in the repository.
+# Invoked through bash rather than executed directly: this repository is
+# developed on a Windows filesystem, which does not carry the exec bit,
+# so relying on it silently breaks the build.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/_site"
 
+# The prebuild step copies the branding assets from their canonical locations
+# (assets/ holds the banner, data/ holds the icon) into website/public/.
+cd "$ROOT/website"
+
+if command -v pnpm >/dev/null 2>&1; then
+  pnpm install --frozen-lockfile
+  pnpm build
+else
+  npm ci
+  npm run build
+fi
+
 rm -rf "$OUT"
 mkdir -p "$OUT"
-
-cp "$ROOT"/site/*.html "$OUT"/
-cp "$ROOT"/site/*.css  "$OUT"/
-
-cp "$ROOT/assets/printdrop_banner.webp" "$OUT/banner.webp"
-cp "$ROOT/data/logo.webp"               "$OUT/logo.webp"
+cp -a "$ROOT/website/out/." "$OUT/"
 
 # GitHub Pages runs Jekyll over the artifact unless told not to.
 touch "$OUT/.nojekyll"
 
 echo "Built site:"
-find "$OUT" -type f -printf '  %P (%s bytes)\n' | sort
+find "$OUT" -maxdepth 1 -type f -printf '  %P (%s bytes)\n' | sort

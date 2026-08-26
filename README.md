@@ -183,7 +183,7 @@ src/common/       shared helpers
 data/             web UI, flashed to LittleFS
 docs/             architecture, hardware, bugs, flashing notes
 assets/           branding
-site/             GitHub Pages source
+website/          GitHub Pages source (Next.js, statically exported)
 ```
 
 ## Partitions

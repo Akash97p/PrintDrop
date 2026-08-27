@@ -27,6 +27,9 @@ const NAV_LINKS = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false)
+  const basePath =
+    process.env.NEXT_BASE_PATH ??
+    (process.env.NODE_ENV === "production" ? "/PrintDrop" : "")
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -36,7 +39,7 @@ export function SiteHeader() {
           className="flex items-center gap-2 font-semibold tracking-tight"
         >
           <Image
-            src="/logo.webp"
+            src={`${basePath}/logo.webp`}
             alt=""
             width={26}
             height={26}
@@ -84,7 +87,7 @@ export function SiteHeader() {
                 <SheetTitle>
                   <span className="flex items-center gap-2">
                     <Image
-                      src="/logo.webp"
+                      src={`${basePath}/logo.webp`}
                       alt=""
                       width={22}
                       height={22}

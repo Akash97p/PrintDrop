@@ -135,7 +135,7 @@
     <div class="view__head"><h1 id="settings-heading" class="view__title">Settings</h1></div>
     <div class="card">
       <h2 class="card__title">Wi-Fi</h2>
-      <p class="muted muted--sm" style="margin-bottom:10px">Saving reboots the device. It will rejoin on the new network — you may need to reconnect to it.</p>
+      <p class="muted muted--sm" style="margin-bottom:10px">Saving reboots the device. It will rejoin on the new network — you may need to reconnect to it. Also reachable at <code id="discInfo">printdrop.local / printdrop</code> via mDNS+LLMNR.</p>
       <div class="row" style="margin-bottom:12px">
         <button id="scanBtn" class="btn btn--secondary" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Scan networks</button>
         <span id="scanStatus" class="muted muted--sm" aria-live="polite"></span>
@@ -154,6 +154,34 @@
         </div>
         <button class="btn btn--primary" type="submit">Save &amp; reboot</button>
       </form>
+    </div>
+    <div class="card" id="authCard">
+      <h2 class="card__title">Web UI Login</h2>
+      <p class="muted muted--sm" style="margin-bottom:10px">Protects the whole UI + API with HTTP Basic. Stored as SHA-256 in NVS. Initial user/hash from <code>platformio.ini</code> <code>PRINTDROP_AUTH_*</code> or via serial <code>auth &lt;user&gt; &lt;pass&gt;</code>. Leave blank to keep current.</p>
+      <form id="authForm" class="form">
+        <label>Username<input name="user" id="authUser" autocomplete="username" placeholder="admin"></label>
+        <label>New password<input name="pass" id="authPass" type="password" autocomplete="new-password" placeholder="••••••••"></label>
+        <label>Confirm<input id="authPass2" type="password" placeholder="••••••••"></label>
+        <div class="row">
+          <button class="btn btn--primary" type="submit">Save login</button>
+          <span id="authStatus" class="muted muted--sm"></span>
+        </div>
+      </form>
+      <p class="muted muted--sm">Button long-press 5 s: factory reset (clears Wi-Fi + login). Serial: <code>clear-auth</code> / <code>factory-reset</code>.</p>
+    </div>
+    <div class="card" id="otaCard">
+      <h2 class="card__title">Firmware (OTA)</h2>
+      <p class="muted muted--sm">Current: <code id="otaCurrent">—</code> <span id="otaEnabledBadge"></span></p>
+      <div id="otaSDBox" class="hidden" style="margin:10px 0; padding:10px; border:1px solid var(--line); border-radius:8px">
+        <strong>SD update available: <span id="otaSDVer">—</span></strong>
+        <p class="muted muted--sm" id="otaSDNotes"></p>
+        <button id="otaSDTrigger" class="btn btn--primary" type="button">Update from SD</button>
+      </div>
+      <label class="btn btn--secondary" style="margin-top:8px"><input id="otaFile" type="file" accept=".bin" hidden> Choose firmware .bin</label>
+      <span id="otaFileName" class="muted muted--sm"></span>
+      <div id="otaProgress" class="progress hidden" style="margin-top:8px"><div id="otaBar" class="progress__fill"></div></div>
+      <p class="muted muted--sm">Or copy <code>firmware.bin</code> + <code>firmware.json</code> <code>{"version":"0.2.0"}</code> to SD root, then refresh. Uses dual OTA slots (<code>partitions_printdrop_ota.csv</code>).</p>
+      <p class="muted muted--sm">LED: idle 2 s blink, activity fast, error double-blink. Button short = eject, long = factory reset.</p>
     </div>
   </section>
 

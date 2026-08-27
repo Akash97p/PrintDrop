@@ -15,6 +15,11 @@
 #include "config.h"
 #include "net.h"
 #include "storage.h"
+#include "auth.h"
+#include "ws.h"
+#include "ota.h"
+#include "led.h"
+#include <Update.h>
 
 namespace web {
 namespace {
@@ -95,6 +100,15 @@ void sendError(int code, const String& message) {
     sendJson(code, String("{\"ok\":false,\"error\":\"") + jsonEscape(message) + "\"}");
 }
 
+bool requireAuth() {
+    if (!auth::isRequired()) return true;
+    String hdr = server.header("Authorization");
+    if (auth::checkBasicAuth(hdr)) return true;
+    server.sendHeader("WWW-Authenticate", "Basic realm=\"PrintDrop\"");
+    sendError(401, "Authentication required");
+    return false;
+}
+
 const char* contentTypeFor(const String& path) {
     if (path.endsWith(".html")) return "text/html";
     if (path.endsWith(".css"))  return "text/css";
@@ -172,14 +186,36 @@ void handleStatus() {
     j +=   "\"hostPresent\":" + String(storage::usbHostPresent() ? "true" : "false") + ",";
     j +=   "\"mediaPresent\":" + String(storage::usbMediaPresent() ? "true" : "false");
     j += "},";
+    j += "\"discovery\":{";
+    j +=   "\"mdns\":" + String(PRINTDROP_ENABLE_MDNS ? "true" : "false") + ",";
+    j +=   "\"llmnr\":" + String(PRINTDROP_ENABLE_LLMNR ? "true" : "false");
+    j += "},";
+    j += "\"auth\":{";
+    j +=   "\"required\":" + String(auth::isRequired() ? "true" : "false") + ",";
+    j +=   "\"user\":\"" + jsonEscape(auth::currentUser()) + "\"";
+    j += "},";
+    j += "\"wsPort\":81,";
+    j += "\"ota\":{";
+    j +=   "\"enabled\":" + String(PRINTDROP_ENABLE_OTA ? "true" : "false") + ",";
+    j +=   "\"version\":\"" + jsonEscape(ota::currentVersion()) + "\"";
+    {
+        String v, n;
+        bool sdAvail = ota::checkSD(&v, &n);
+        j += ",\"sdAvailable\":" + String(sdAvail ? "true" : "false");
+        if (sdAvail) { j += ",\"sdVersion\":\"" + jsonEscape(v) + "\""; }
+    }
+    j += "},";
     j += "\"uptimeMs\":" + String(millis());
     j += "}";
+    // Push to WS clients as well
+    ws::broadcastStatus(j);
     sendJson(200, j);
 }
 
 // --- API: listing ----------------------------------------------------------
 
 void handleList() {
+    if (!requireAuth()) return;
     String path;
     if (!safePath(server.arg("path"), path)) return sendError(400, "Invalid path");
 
@@ -229,6 +265,7 @@ void removeRecursive(const String& path) {
 }
 
 void handleDelete() {
+    if (!requireAuth()) return;
     String path;
     if (!safePath(server.arg("path"), path)) return sendError(400, "Invalid path");
     if (path == "/") return sendError(400, "Refusing to delete the card root");
@@ -244,6 +281,7 @@ void handleDelete() {
 }
 
 void handleMkdir() {
+    if (!requireAuth()) return;
     String path;
     if (!safePath(server.arg("path"), path)) return sendError(400, "Invalid path");
     if (path == "/") return sendError(400, "Invalid folder name");
@@ -256,6 +294,7 @@ void handleMkdir() {
 }
 
 void handleRename() {
+    if (!requireAuth()) return;
     String from, to;
     if (!safePath(server.arg("from"), from) || !safePath(server.arg("to"), to)) {
         return sendError(400, "Invalid path");
@@ -271,6 +310,7 @@ void handleRename() {
 }
 
 void handleDownload() {
+    if (!requireAuth()) return;
     String path;
     if (!safePath(server.arg("path"), path)) return sendError(400, "Invalid path");
 
@@ -288,6 +328,7 @@ void handleDownload() {
 }
 
 void handleEject() {
+    if (!requireAuth()) return;
     storage::refreshHostView();
     sendOk();
 }
@@ -298,6 +339,11 @@ void handleUploadData() {
     HTTPUpload& up = server.upload();
 
     if (up.status == UPLOAD_FILE_START) {
+        if (auth::isRequired() && !auth::checkBasicAuth(server.header("Authorization"))) {
+            uploadError = "Authentication required";
+            return;
+        }
+        led::setActivity(true);
         uploadError = "";
         uploadBytes = 0;
 
@@ -325,18 +371,29 @@ void handleUploadData() {
 
     } else if (up.status == UPLOAD_FILE_WRITE) {
         if (uploadFile && uploadError.isEmpty()) {
+            uint32_t t0 = millis();
             if (uploadFile.write(up.buf, up.currentSize) != up.currentSize) {
                 uploadError = "Write failed — card full?";
             } else {
                 uploadBytes += up.currentSize;
+                // WS progress (best-effort)
+                uint8_t pct = 0;
+                if (up.totalSize > 0) pct = (uint8_t)(uploadBytes * 100 / up.totalSize);
+                uint32_t elapsed = millis() - t0 + 1;
+                uint32_t rate = up.currentSize * 1000 / elapsed;
+                uint32_t eta = 0;
+                if (rate > 0 && up.totalSize > uploadBytes) eta = (up.totalSize - uploadBytes) / rate;
+                ws::broadcastProgress(uploadName, pct, rate, eta);
             }
         }
 
     } else if (up.status == UPLOAD_FILE_END) {
         if (uploadFile) uploadFile.close();
         if (uploadHoldsLock) { storage::unlock(); uploadHoldsLock = false; }
+        led::setActivity(false);
         if (uploadError.isEmpty()) {
             log("[web] uploaded %s (%u bytes)", uploadName.c_str(), (unsigned)uploadBytes);
+            ws::broadcastProgress(uploadName, 100, 0, 0);
         }
 
     } else if (up.status == UPLOAD_FILE_ABORTED) {
@@ -344,11 +401,18 @@ void handleUploadData() {
         // Do not leave a truncated file that looks like a valid print job.
         if (!uploadName.isEmpty() && SD_FS.exists(uploadName)) SD_FS.remove(uploadName);
         if (uploadHoldsLock) { storage::unlock(); uploadHoldsLock = false; }
+        led::setActivity(false);
         uploadError = "Upload aborted";
     }
 }
 
 void handleUploadDone() {
+    if (auth::isRequired() && !auth::checkBasicAuth(server.header("Authorization"))) {
+        if (uploadHoldsLock) { storage::unlock(); uploadHoldsLock=false; }
+        if (uploadFile) { uploadFile.close(); }
+        server.sendHeader("WWW-Authenticate", "Basic realm=\"PrintDrop\"");
+        return sendError(401, "Authentication required");
+    }
     if (!uploadError.isEmpty()) return sendError(500, uploadError);
     String j = "{\"ok\":true,\"name\":\"" + jsonEscape(uploadName) + "\",";
     j += "\"size\":" + String((uint32_t)uploadBytes) + "}";
@@ -358,6 +422,7 @@ void handleUploadDone() {
 // --- API: Wi-Fi ------------------------------------------------------------
 
 void handleWifiScan() {
+    if (!requireAuth()) return;
     const int n = WiFi.scanNetworks();
     String j = "{\"networks\":[";
     for (int i = 0; i < n && i < 25; ++i) {
@@ -372,6 +437,7 @@ void handleWifiScan() {
 }
 
 void handleWifiSave() {
+    if (!requireAuth()) return;
     net::Config c = net::config();
     if (server.hasArg("ssid"))     c.ssid      = server.arg("ssid");
     if (server.hasArg("password")) c.password  = server.arg("password");
@@ -390,13 +456,101 @@ void handleWifiSave() {
     wantReboot = true;
 }
 
+// --- API: auth -------------------------------------------------------------
+
+void handleAuthStatus() {
+    String j = "{";
+    j += "\"required\":" + String(auth::isRequired() ? "true" : "false") + ",";
+    j += "\"user\":\"" + jsonEscape(auth::currentUser()) + "\"";
+    j += "}";
+    sendJson(200, j);
+}
+
+void handleAuthSet() {
+    if (!requireAuth()) return;
+    String user = server.arg("user");
+    String pass = server.arg("pass");
+    if (user.isEmpty() || pass.isEmpty()) return sendError(400, "user and pass required");
+    if (pass.length() < 4) return sendError(400, "password too short (min 4)");
+    if (!auth::setCredentials(user, pass)) return sendError(500, "NVS error");
+    log("[auth] credentials changed for '%s'", user.c_str());
+    sendOk();
+}
+
+// --- API: OTA --------------------------------------------------------------
+
+String otaError;
+bool   otaHoldsLock = false;
+
+void handleOtaStatus() {
+    if (!requireAuth()) return;
+    String ver, notes;
+    bool sdAvail = ota::checkSD(&ver, &notes);
+    String j = "{";
+    j += "\"current\":\"" + jsonEscape(ota::currentVersion()) + "\",";
+    j += "\"sdAvailable\":" + String(sdAvail ? "true" : "false") + ",";
+    if (sdAvail) {
+        j += "\"sdVersion\":\"" + jsonEscape(ver) + "\",";
+        j += "\"sdNotes\":\"" + jsonEscape(notes) + "\",";
+    }
+    j += "\"updating\":" + String(ota::isUpdating() ? "true" : "false");
+    j += "}";
+    sendJson(200, j);
+}
+
+void handleOtaSDTrigger() {
+    if (!requireAuth()) return;
+    String err;
+    if (!ota::checkSD()) return sendError(404, "No SD OTA image");
+    if (!ota::triggerSDUpdate(&err)) return sendError(500, err);
+    sendJson(200, "{\"ok\":true,\"rebooting\":true}");
+    wantReboot = true;
+}
+
+void handleOtaUploadDone() {
+    if (!requireAuth()) { ota::abortUpdate(); return; }
+    if (!otaError.isEmpty()) { String e=otaError; otaError=""; sendError(500, e); return; }
+    String err;
+    if (!ota::endUpdate(&err)) return sendError(500, err);
+    log("[ota] HTTP OTA complete, rebooting");
+    sendJson(200, "{\"ok\":true,\"rebooting\":true}");
+    wantReboot = true;
+}
+
+void handleOtaUploadData() {
+    HTTPUpload& up = server.upload();
+    if (up.status == UPLOAD_FILE_START) {
+        otaError = "";
+        String err;
+        size_t total = server.header("Content-Length").toInt();
+        // WebServer doesn't give total easily; use UPDATE_SIZE_UNKNOWN if 0
+        if (total == 0) total = UPDATE_SIZE_UNKNOWN;
+        if (!ota::beginUpdate(total, &err)) { otaError = err; return; }
+    } else if (up.status == UPLOAD_FILE_WRITE) {
+        if (!otaError.isEmpty()) return;
+        String err;
+        if (!ota::writeUpdate(up.buf, up.currentSize, &err)) { otaError = err; ota::abortUpdate(); }
+    } else if (up.status == UPLOAD_FILE_END) {
+        // handled in done
+    } else if (up.status == UPLOAD_FILE_ABORTED) {
+        ota::abortUpdate();
+        otaError = "Upload aborted";
+    }
+}
+
 }  // namespace
 
 bool begin() {
+    auth::begin();
+    ota::begin();
+    ws::begin();
     if (!LittleFS.begin(false)) {
         log("[web] LittleFS mount failed — run 'pio run -t uploadfs'");
         // Still serve the API so the device is configurable without a UI.
     }
+
+    const char* hdrKeys[] = {"Authorization"};
+    server.collectHeaders(hdrKeys, 1);
 
     server.on("/api/status",    HTTP_GET,  handleStatus);
     server.on("/api/list",      HTTP_GET,  handleList);
@@ -408,14 +562,23 @@ bool begin() {
     server.on("/api/wifi/scan", HTTP_GET,  handleWifiScan);
     server.on("/api/wifi",      HTTP_POST, handleWifiSave);
     server.on("/api/upload",    HTTP_POST, handleUploadDone, handleUploadData);
+    server.on("/api/auth/status", HTTP_GET,  handleAuthStatus);
+    server.on("/api/auth/set",    HTTP_POST, handleAuthSet);
+    server.on("/api/ota/status",  HTTP_GET,  handleOtaStatus);
+    server.on("/api/ota/sd",      HTTP_POST, handleOtaSDTrigger);
+    server.on("/api/ota",         HTTP_POST, handleOtaUploadDone, handleOtaUploadData);
 
     server.onNotFound(handleNotFound);
     server.begin();
-    log("[web] listening on port 80");
+    log("[web] listening on port 80, ws on 81, auth %s", auth::isRequired() ? "on" : "off");
     return true;
 }
 
-void loop() { server.handleClient(); }
+void loop() {
+    server.handleClient();
+    ws::loop();
+    ota::loop();
+}
 bool rebootRequested() { return wantReboot; }
 
 }  // namespace web

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import {
+  Activity,
   ArrowRight,
   ArrowUpRight,
   Cable,
@@ -7,7 +8,11 @@ import {
   FileText,
   Globe,
   HardDrive,
+  KeyRound,
+  Lightbulb,
+  Radio,
   RefreshCw,
+  Search,
   ShieldCheck,
   Usb,
   Wifi,
@@ -116,6 +121,34 @@ const SIGNAL_PATH = [
   { icon: FileText, title: "Your printer", description: "Reads its USB menu" },
 ]
 
+const UX = [
+  {
+    icon: Radio,
+    title: "WebSocket progress",
+    description: "ws://:81 pushes upload progress and status — no 5 s poll, every client sees the same bar.",
+  },
+  {
+    icon: Lightbulb,
+    title: "LED + button",
+    description: "Idle 2 s heartbeat, activity fast blink, error double-blink. Short press = eject, 5 s = factory reset.",
+  },
+  {
+    icon: Search,
+    title: "mDNS + LLMNR",
+    description: "http://printdrop.local (mDNS) and http://printdrop (LLMNR) — Windows without Bonjour still finds it.",
+  },
+  {
+    icon: KeyRound,
+    title: "Web UI auth",
+    description: "HTTP Basic, SHA-256 in NVS, seed from ini, change via serial auth or Settings.",
+  },
+  {
+    icon: Activity,
+    title: "Dual OTA",
+    description: "POST /api/ota with .bin or drop firmware.bin+.json on SD — dual 1 344 KB slots on 4 MB.",
+  },
+]
+
 const DOCS = [
   {
     href: `${GITHUB_URL}#readme`,
@@ -131,6 +164,26 @@ const DOCS = [
     href: `${REPO}/docs/hardware.md`,
     title: "Hardware",
     description: "The board as measured, wiring and power",
+  },
+  {
+    href: `${REPO}/docs/sdio.md`,
+    title: "SDIO 4-bit",
+    description: "6-wire migration, 6 s vs 80 s uploads",
+  },
+  {
+    href: `${REPO}/docs/auth.md`,
+    title: "Authentication",
+    description: "HTTP Basic, SHA-256 NVS, Basic header",
+  },
+  {
+    href: `${REPO}/docs/discovery.md`,
+    title: "Discovery",
+    description: "mDNS + LLMNR, printdrop.local / printdrop",
+  },
+  {
+    href: `${REPO}/docs/ota.md`,
+    title: "OTA update",
+    description: "Dual 1 344 KB slots, HTTP + SD card",
   },
   {
     href: `${REPO}/docs/bugs.md`,
@@ -432,6 +485,36 @@ export default function Home() {
               </Card>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ----------------------------------------------------------- new in feat/ux */}
+      <section className="border-y bg-card/40">
+        <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6">
+          <div className="max-w-2xl">
+            <Badge>New in feat/ux</Badge>
+            <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em]">
+              Five small pieces, one coherent UX.
+            </h2>
+            <p className="mt-5 leading-7 text-muted-foreground">
+              Live progress over WebSocket, a heartbeat LED you can read across the room, zero-config discovery that
+              actually works on Windows, a login that lives in NVS, and an OTA path that survives a bad flash — all
+              on the same 4 MB stick.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+            {UX.map((f) => (
+              <Card key={f.title}>
+                <CardHeader>
+                  <div className="mb-3 flex size-9 items-center justify-center rounded-md border bg-background">
+                    <f.icon className="size-4" />
+                  </div>
+                  <CardTitle className="text-sm">{f.title}</CardTitle>
+                  <CardDescription className="leading-6 text-xs">{f.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 

@@ -108,10 +108,12 @@ upload callback.
 
 | Env | Sources | USB mode | Purpose |
 |---|---|---|---|
-| `printdrop` | `src/printdrop/` | TinyUSB | The product |
+| `printdrop` | `src/printdrop/` | TinyUSB | The product — **SDIO 4-bit** (`feat/sdio` default) |
+| `printdrop_spi` | `src/printdrop/` | TinyUSB | The product — **SPI legacy** (4-wire, no re-wire) |
 | `msc` | `src/legacy/` | TinyUSB | USB mass storage only, no networking |
 | `ramdisk` | `src/diag/msc_ramdisk.cpp` | TinyUSB | RAM-backed FAT12 volume; proves USB MSC without the SD card |
 | `diag` | `src/diag/sd_diag.cpp` | Serial/JTAG | SPI speed sweep, geometry, MBR dump, root listing |
+| `diag_sdio` | `src/diag/sd_diag.cpp` | Serial/JTAG | **SDIO 4-bit** bring-up, bus width + throughput sweep |
 | `scan` | `src/diag/sd_scan.cpp` | Serial/JTAG | Pin health, line voltages, pin-permutation sweep |
 
 The diagnostic environments deliberately keep `ARDUINO_USB_MODE=1` so the native
@@ -138,15 +140,21 @@ targets.
 
 ## Measured performance
 
-| Path | Throughput |
-|---|---|
-| USB read (uncached) | 485 KB/s |
-| USB write | 248 KB/s |
-| Raw SD SPI | ~910 KB/s |
+| Path | Throughput | Bus |
+|---|---|---|
+| USB read (uncached) | 485 KB/s | SPI @ 20 MHz |
+| USB write | 248 KB/s | SPI @ 20 MHz |
+| Raw SD | ~910 KB/s | SPI @ 20 MHz |
 
-Bounded by driving the card in SPI mode rather than 4-bit SDIO. A 20 MB print
-job takes roughly 80 seconds to upload; the card, not the network, is the
-bottleneck.
+On `feat/sdio` (SDIO 4-bit) the same host at the same clock is ~3-4×
+faster — projected 3 200 KB/s read / 2 000 KB/s write / 3 500 KB/s raw
+at 20 MHz, so a 20 MB print job drops from ~80 s to ~6 s. The SDMMC host
+at 40 MHz can reach ~6 000 KB/s raw on a short breakout; see
+[hardware.md](hardware.md#sdio-clocks--featsdio-projected).
+
+On `main` the path is bounded by driving the card in SPI mode rather than
+4-bit SDIO — the card, not the network, is the bottleneck. `feat/sdio`
+removes that bound.
 
 Verified end to end over USB: a 2 MB write survives a SHA-256 round trip
 (`6EA73B45…C562` identical both sides), and the ESP32's own directory listing

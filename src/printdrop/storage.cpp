@@ -3,8 +3,35 @@
 #include <USB.h>
 #include <USBMSC.h>
 #include <esp32-hal-tinyusb.h>   // TUSB_CLASS_* — not pulled in by USB.h
+#ifdef USE_SDIO
+#include <SD_MMC.h>
+#include "sdmmc_cmd.h"
+#include "esp_vfs_fat.h"
+// ---------------------------------------------------------------------------
+// SD_MMC Arduino 2.0.x does not expose raw block access or geometry.
+// The underlying sdmmc_card_t is kept in the protected _card member,
+// so we expose it via a minimal subclass hack. This avoids forking the
+// library and stays compatible with future core updates that may add a
+// public card() accessor.
+class SDMMCHack : public fs::SDMMCFS {
+public:
+    sdmmc_card_t* getCard() { return _card; }
+};
+#define SD_MMC_CARD (reinterpret_cast<SDMMCHack*>(&SD_MMC)->getCard())
+inline bool sdioReadRAW(uint8_t* buf, uint32_t sector) {
+    sdmmc_card_t* c = SD_MMC_CARD;
+    if (!c) return false;
+    return sdmmc_read_sectors(c, buf, sector, 1) == ESP_OK;
+}
+inline bool sdioWriteRAW(uint8_t* buf, uint32_t sector) {
+    sdmmc_card_t* c = SD_MMC_CARD;
+    if (!c) return false;
+    return sdmmc_write_sectors(c, buf, sector, 1) == ESP_OK;
+}
+#else
 #include <SPI.h>
 #include <SD.h>
+#endif
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
@@ -14,13 +41,18 @@ namespace storage {
 namespace {
 
 USBMSC      msc;
+#ifdef USE_SDIO
+// SDIO uses the ESP32-S3 SDMMC host — no SPIClass needed.
+#else
 SPIClass    sdSPI;
+#endif
 SemaphoreHandle_t sdMutex = nullptr;
 
 bool     mounted        = false;
 uint32_t secSize        = 0;
 uint32_t secCount       = 0;
 uint32_t activeFreq     = 0;
+uint32_t activeWidth    = 0;
 
 volatile bool hostWrote      = false;   // host changed sectors under our FATFS
 volatile bool hostAttached   = false;
@@ -40,6 +72,64 @@ void log(const char* fmt, ...) {
 }
 
 // --- SD mounting -----------------------------------------------------------
+
+#ifdef USE_SDIO
+
+// SDIO 4-bit via the SDMMC host. The driver handles the 400 kHz
+// identification internally, so we only validate the link at each frequency
+// step and keep the fastest that survives a probe read.
+bool mountCard() {
+    const bool mode1bit = (SDMMC_WIDTH == 1);
+    SD_MMC.setPins(SDMMC_CLK_PIN, SDMMC_CMD_PIN, SDMMC_D0_PIN,
+                   mode1bit ? -1 : SDMMC_D1_PIN,
+                   mode1bit ? -1 : SDMMC_D2_PIN,
+                   mode1bit ? -1 : SDMMC_D3_PIN);
+
+    // Ladder in kHz (SD_MMC API takes kHz). 40 MHz is SDHC high-speed max;
+    // 20 MHz is conservative on jumper wiring and still ~4x SPI.
+    const uint32_t ladderKhz[] = {
+        SDMMC_FREQ / 1000,
+        20000,
+        10000,
+        4000,
+        1000,
+    };
+
+    for (uint32_t fKhz : ladderKhz) {
+        if (SD_MMC.begin("/sdcard", mode1bit, false, fKhz, 5)) {
+            // Verify before trusting: a marginal clock mounts but serves corrupt
+            // sectors. Use the raw sdmmc path — SD_MMC Arduino 2.0.x has no
+            // readRAW/sectorSize/numSectors.
+            uint8_t probe[512];
+            if (sdioReadRAW(probe, 0) && probe[510] == 0x55 && probe[511] == 0xAA) {
+                sdmmc_card_t* c = SD_MMC_CARD;
+                activeFreq  = fKhz * 1000;
+                activeWidth = mode1bit ? 1 : 4;
+                secSize     = c ? (uint32_t)c->csd.sector_size : 512;
+                secCount    = c ? (uint32_t)c->csd.capacity : (uint32_t)(SD_MMC.cardSize() / secSize);
+                log("[sd] SDIO %u-bit mounted at %u Hz, %u sectors x %u bytes",
+                    activeWidth, activeFreq, secCount, secSize);
+                return true;
+            }
+            log("[sd] SDIO %u-bit %u kHz mounted but probe failed, stepping down",
+                mode1bit ? 1 : 4, fKhz);
+            SD_MMC.end();
+        } else {
+            log("[sd] SDIO %u-bit %u kHz mount failed, stepping down",
+                mode1bit ? 1 : 4, fKhz);
+        }
+        delay(200);
+    }
+
+    log("[sd] SDIO mount failed at all frequencies");
+    return false;
+}
+
+void endBus() {
+    SD_MMC.end();
+}
+
+#else  // SPI
 
 // The SD specification requires identification at <=400 kHz; only afterwards
 // may the clock rise. SD.begin() runs that sequence at whatever frequency it is
@@ -70,9 +160,10 @@ bool mountCard() {
         uint8_t probe[512];
         if (SD.readRAW(probe, 0) && probe[510] == 0x55 && probe[511] == 0xAA) {
             activeFreq = f;
+            activeWidth = 1;
             secSize    = SD.sectorSize();
             secCount   = SD.numSectors();
-            log("[sd] mounted at %u Hz, %u sectors x %u bytes", f, secCount, secSize);
+            log("[sd] SPI mounted at %u Hz, %u sectors x %u bytes", f, secCount, secSize);
             return true;
         }
     }
@@ -80,21 +171,33 @@ bool mountCard() {
     SD.end();
     if (SD.begin(SD_CS_PIN, sdSPI, 400000)) {
         activeFreq = 400000;
+        activeWidth = 1;
         secSize    = SD.sectorSize();
         secCount   = SD.numSectors();
-        log("[sd] fell back to 400 kHz");
+        log("[sd] SPI fell back to 400 kHz");
         return true;
     }
     return false;
 }
+
+void endBus() {
+    SD.end();
+    sdSPI.end();
+}
+
+#endif
 
 // Re-read the filesystem if the USB host has changed it underneath us.
 void refreshMountIfStale() {
     if (!hostWrote) return;
     hostWrote = false;
     log("[sd] host wrote sectors, remounting FATFS");
+#ifdef USE_SDIO
+    SD_MMC.end();
+#else
     SD.end();
     sdSPI.end();
+#endif
     mounted = mountCard();
 }
 
@@ -113,7 +216,11 @@ int32_t onRead(uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize) {
     if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(kMscLockTimeoutMs)) != pdTRUE) return -1;
     int32_t result = bufsize;
     for (uint32_t i = 0; i < count; ++i) {
+#ifdef USE_SDIO
+        if (!sdioReadRAW(reinterpret_cast<uint8_t*>(buffer) + i * secSize, lba + i)) {
+#else
         if (!SD.readRAW(reinterpret_cast<uint8_t*>(buffer) + i * secSize, lba + i)) {
+#endif
             result = -1;
             break;
         }
@@ -131,7 +238,11 @@ int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize
     if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(kMscLockTimeoutMs)) != pdTRUE) return -1;
     int32_t result = bufsize;
     for (uint32_t i = 0; i < count; ++i) {
+#ifdef USE_SDIO
+        if (!sdioWriteRAW(buffer + i * secSize, lba + i)) {
+#else
         if (!SD.writeRAW(buffer + i * secSize, lba + i)) {
+#endif
             result = -1;
             break;
         }
@@ -204,30 +315,54 @@ bool begin() {
     msc.begin(secCount, secSize);
 
     USB.begin();
-    log("[usb] mass storage started");
+    log("[usb] mass storage started (%s %u-bit @ %u Hz)", busMode(), busWidth(), busFrequency());
     return true;
 }
 
-bool     cardMounted()   { return mounted; }
-uint32_t sectorCount()   { return secCount; }
-uint32_t sectorSize()    { return secSize; }
-uint32_t spiFrequency()  { return activeFreq; }
+bool     cardMounted()    { return mounted; }
+uint32_t sectorCount()    { return secCount; }
+uint32_t sectorSize()     { return secSize; }
+uint32_t spiFrequency()   { return activeFreq; }
+uint32_t busFrequency()   { return activeFreq; }
+uint32_t busWidth()       { return activeWidth; }
+const char* busMode() {
+#ifdef USE_SDIO
+    return (SDMMC_WIDTH == 1) ? "sdio-1bit" : "sdio-4bit";
+#else
+    return "spi";
+#endif
+}
 bool     usbHostPresent() { return hostAttached; }
 bool     usbMediaPresent(){ return mediaOffered; }
 
 uint64_t totalBytes() {
     Guard g(false, 3000);
-    return g.ok() ? SD.totalBytes() : 0;
+    if (!g.ok()) return 0;
+#ifdef USE_SDIO
+    return SD_MMC.totalBytes();
+#else
+    return SD.totalBytes();
+#endif
 }
 uint64_t usedBytes() {
     Guard g(false, 3000);
-    return g.ok() ? SD.usedBytes() : 0;
+    if (!g.ok()) return 0;
+#ifdef USE_SDIO
+    return SD_MMC.usedBytes();
+#else
+    return SD.usedBytes();
+#endif
 }
 uint64_t freeBytes() {
     Guard g(false, 3000);
     if (!g.ok()) return 0;
+#ifdef USE_SDIO
+    const uint64_t total = SD_MMC.totalBytes();
+    const uint64_t used  = SD_MMC.usedBytes();
+#else
     const uint64_t total = SD.totalBytes();
     const uint64_t used  = SD.usedBytes();
+#endif
     return total > used ? total - used : 0;
 }
 

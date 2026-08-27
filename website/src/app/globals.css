@@ -1,0 +1,91 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* The site ships dark-only, in step with the AgentNotify reference: one
+   monochrome world — near-black ground, off-white ink, hairline borders —
+   and no theme toggle. */
+:root,
+.dark {
+  --radius: 0.625rem;
+  --background: #030303;
+  --foreground: #fafafa;
+  --card: #060606;
+  --card-foreground: #fafafa;
+  --popover: #060606;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #060606;
+  --secondary: #141414;
+  --secondary-foreground: #fafafa;
+  --muted: #121212;
+  --muted-foreground: #989898;
+  --accent: #161616;
+  --accent-foreground: #fafafa;
+  --destructive: #ee343b;
+  --border: #1f1f1f;
+  --input: #1f1f1f;
+  --ring: #7a7a7a;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  /* Anchored sections clear the sticky header when jumped to. */
+  section[id] {
+    scroll-margin-top: 3.5rem;
+  }
+}
+
+/* Faint blueprint grid behind the hero, fading out towards the fold. */
+.grid-surface {
+  background-image: linear-gradient(
+      to right,
+      color-mix(in oklab, var(--border) 55%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--border) 55%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 48px 48px;
+  -webkit-mask-image: linear-gradient(#000 20%, #0000 90%);
+  mask-image: linear-gradient(#000 20%, #0000 90%);
+}

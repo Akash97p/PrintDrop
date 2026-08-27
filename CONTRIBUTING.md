@@ -12,7 +12,7 @@ traps that have already cost time.
 - An ESP32-S3 board. The tree is configured for an **ESP32-S3-DevKitC-1 with
   4 MB flash and no PSRAM**; other variants need the partition table and
   `board_upload.flash_size` adjusted.
-- An SD or microSD breakout wired for SPI, powered from **3V3**.
+- An SD or microSD breakout — **SDIO 4-bit on `feat/sdio`** (6 wires, CLK/CMD/D0-D3 with pull-ups, 3.3 V-native breakout) or **SPI on `main`** (4 wires). See `docs/hardware.md`.
 - A **FAT32** card. exFAT will not mount.
 - Both USB ports connected — the native port carries the mass storage device,
   the UART bridge carries the console.
@@ -35,16 +35,17 @@ Changing anything under `data/` needs `uploadfs`, not `upload`.
 ```
 src/printdrop/    the product
   main.cpp        startup, serial console
-  storage.cpp     SD card and USB mass storage arbitration
+  storage.cpp     SD card and USB mass storage arbitration (SPI + SDIO)
   net.cpp         Wi-Fi provisioning, mDNS, static IP
   web.cpp         HTTP server and JSON file API
-src/diag/         SD and USB diagnostics
+  config.h        pins, bus selection (USE_SDIO), clocks
+src/diag/         SD and USB diagnostics (spi + sdio)
 src/legacy/       USB mass storage only, no networking
 src/common/       shared helpers
 data/             web UI, flashed to LittleFS
 docs/             architecture, hardware, bugs, flashing notes
 assets/           branding
-site/             GitHub Pages source
+website/          GitHub Pages source (Next.js, statically exported)
 ```
 
 ## Branches and commits
@@ -165,6 +166,7 @@ Three diagnostic environments exist for when something is wrong:
 |---|---|
 | `scan` | the card is not detected at all — pin health, line voltages, pin-permutation sweep |
 | `diag` | the card mounts but misbehaves — SPI speed sweep, geometry, MBR dump |
+| `diag_sdio` | SDIO bring-up — bus width test, throughput sweep |
 | `ramdisk` | proving the USB path works independently of the SD card |
 
 ## Reporting a problem

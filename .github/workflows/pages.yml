@@ -2,9 +2,11 @@ name: Documentation site
 
 on:
   push:
-    branches: [main]
+    # Validate the site on feature branches (feat/sdio) without deploying;
+    # deploy only happens from main (see deploy job condition).
+    branches: [main, "feat/**", "feature/**"]
     paths:
-      - "site/**"
+      - "website/**"
       - "assets/printdrop_banner.webp"
       - "data/logo.webp"
       - "scripts/build-site.sh"
@@ -25,6 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.2.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
       - uses: actions/configure-pages@v6
       - name: Build static site
         # Invoked through bash rather than executed directly: this repository is
@@ -36,6 +46,8 @@ jobs:
           path: _site
 
   deploy:
+    # Only the main branch publishes to Pages; feature branches just validate.
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

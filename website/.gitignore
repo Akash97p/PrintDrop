@@ -1,0 +1,17 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+next-env.d.ts
+
+# Branding assets are copied in from their canonical locations by
+# scripts/sync-assets.mjs (assets/ holds the banner, data/ holds the icon).
+/public/banner.webp
+/public/logo.webp

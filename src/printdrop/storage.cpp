@@ -36,6 +36,7 @@ inline bool sdioWriteRAW(uint8_t* buf, uint32_t sector) {
 #include <freertos/semphr.h>
 
 #include "config.h"
+#include "led.h"
 
 namespace storage {
 namespace {
@@ -214,6 +215,7 @@ int32_t onRead(uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize) {
     if (lba + count > secCount) return -1;
 
     if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(kMscLockTimeoutMs)) != pdTRUE) return -1;
+    led::setActivity(true);
     int32_t result = bufsize;
     for (uint32_t i = 0; i < count; ++i) {
 #ifdef USE_SDIO
@@ -225,6 +227,7 @@ int32_t onRead(uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize) {
             break;
         }
     }
+    led::setActivity(false);
     xSemaphoreGive(sdMutex);
     return result;
 }
@@ -236,6 +239,7 @@ int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize
     if (lba + count > secCount) return -1;
 
     if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(kMscLockTimeoutMs)) != pdTRUE) return -1;
+    led::setActivity(true);
     int32_t result = bufsize;
     for (uint32_t i = 0; i < count; ++i) {
 #ifdef USE_SDIO
@@ -249,6 +253,7 @@ int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize
     }
     // Our cached FATFS view is now suspect regardless of success.
     hostWrote = true;
+    led::setActivity(false);
     xSemaphoreGive(sdMutex);
     return result;
 }
@@ -370,6 +375,7 @@ bool lock(bool forWrite, uint32_t timeoutMs) {
     if (!sdMutex) return false;
     if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) return false;
 
+    led::setActivity(true);
     if (forWrite) {
         // Withdraw the card so the host stops reading and drops its FAT cache.
         if (mediaWithdrawnDepth++ == 0) setMedia(false);
@@ -384,6 +390,7 @@ void unlock() {
         // Re-present it; the host re-reads the FAT and sees our changes.
         setMedia(true);
     }
+    led::setActivity(false);
     xSemaphoreGive(sdMutex);
 }
 

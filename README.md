@@ -165,6 +165,18 @@ add a DNS rewrite from e.g. `printdrop.office.lan` to the reserved address.
 - **Eject / refresh printer view** — forces the printer to re-read the card.
   Uploads do this automatically; the button is for when a printer needs nudging.
 
+## New in `feat/ux`
+
+| Feature | What it does | See |
+|---|---|---|
+| **WebSocket progress** | `ws://<host>:81/` pushes upload progress & status (polling stays as fallback) | `src/printdrop/ws.*`, `data/app.js` |
+| **LED + button** | LED idle 2 s blink / activity fast blink / error double-blink; button short = eject, long 5 s = factory reset (clears Wi-Fi + login) | `config.h:84`, `docs/hardware.md` |
+| **Discovery** | mDNS `http://printdrop.local` + LLMNR `http://printdrop` (Windows bare name) | `docs/discovery.md` |
+| **Web UI auth** | HTTP Basic, SHA-256 in NVS, seed from `platformio.ini` `PRINTDROP_AUTH_*`, set via serial `auth` or web `Settings` | `docs/auth.md` |
+| **OTA** | `POST /api/ota` (bin upload) + SD `firmware.bin`+`firmware.json` popup, dual OTA slots on 4 MB | `docs/ota.md`, `partitions_printdrop_ota.csv` |
+
+LED `GPIO 38` active-high, button `GPIO 4` active-low with pull-up by default — override with `-D PRINTDROP_LED_PIN` etc. `src/printdrop/config.h:84`/`platformio.ini:150`.
+
 ## Build environments
 
 | Env | Purpose | Console |
@@ -241,9 +253,13 @@ These and the rest of the investigation are written up in [`docs/bugs.md`](docs/
 | | |
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | How the pieces fit: USB/Wi-Fi arbitration, module layout, partitions, performance |
-| [docs/hardware.md](docs/hardware.md) | The board as measured, wiring, power requirements, verified SPI clocks |
+| [docs/hardware.md](docs/hardware.md) | The board as measured, wiring, power requirements, verified SPI clocks, LED/button |
 | [docs/bugs.md](docs/bugs.md) | Every fault found during the port and its root cause |
 | [docs/flashing.md](docs/flashing.md) | Getting this board into download mode |
+| [docs/sdio.md](docs/sdio.md) | SDIO 4-bit migration (feat/sdio) |
+| [docs/auth.md](docs/auth.md) | Web UI login, NVS, Basic auth |
+| [docs/discovery.md](docs/discovery.md) | mDNS + LLMNR (`printdrop.local` / `printdrop`) |
+| [docs/ota.md](docs/ota.md) | Dual OTA slots, HTTP + SD-card update |
 
 ## Contributing
 

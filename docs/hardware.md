@@ -130,6 +130,15 @@ equal-length wires and solid pull-ups. Expected deltas over SPI:
 1-bit SDIO is already ~2× SPI and useful for bring-up (only CLK/CMD/D0 needed);
 4-bit multiplies that by ~4. See [architecture.md](architecture.md#measured-performance) for the bottleneck note.
 
+## LED and button — `feat/ux`
+
+| Signal | GPIO | Notes |
+|--------|------|-------|
+| LED    | 38   | Active-high by default (`PRINTDROP_LED_PIN`, `PRINTDROP_LED_ACTIVE_HIGH`). Idle: 100 ms on / 1900 ms off (2 s period). Activity (SD/USB busy): 100 ms toggle (200 ms period). Error: double-blink. |
+| Button | 4    | Active-low, internal pull-up (`PRINTDROP_BUTTON_PIN`). Short press (<5 s): `storage::refreshHostView()` (eject). Long press ≥5 s: factory reset (clears `printdrop` NVS `ssid`/`pass`/`host`/`auth_*` and reboots). |
+
+Both are `#ifndef`-overrideable via `build_flags` `platformio.ini:150`. Set to `-1` to disable. See `src/printdrop/led.*` / `button.*` and `config.h:84`.
+
 ## Card under test
 
 ```

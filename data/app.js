@@ -31,9 +31,57 @@
   let viewMode = localStorage.getItem('printdrop.view') || 'grid';
   let sortKey = 'name-asc';
   let pollTimer = null;
+  let wsSocket = null;
+  let authUser = localStorage.getItem('printdrop.authUser') || localStorage.getItem('printdrop.authUser') || '';
+  let authPass = localStorage.getItem('printdrop.authPass') || localStorage.getItem('printdrop.authPass') || '';
+  // compat: also check printdrop.authUser/Pass keys used below
+  authUser = localStorage.getItem('printdrop.authUser') || authUser;
+  authPass = localStorage.getItem('printdrop.authPass') || authPass;
 
   const $ = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+  function authHeader(){
+    if(authUser && authPass) return 'Basic ' + btoa(authUser + ':' + authPass);
+    return null;
+  }
+  function setAuth(u,p){
+    authUser = u; authPass = p;
+    localStorage.setItem('printdrop.authUser', u);
+    localStorage.setItem('printdrop.authPass', p);
+  }
+  function clearAuth(){ localStorage.removeItem('printdrop.authUser'); localStorage.removeItem('printdrop.authPass'); authUser=''; authPass=''; }
+  async function promptAuth(){
+    const u = await openModal({title:'Login required',msg:'Enter PrintDrop login from platformio.ini or serial `auth`',showInput:true,inputValue:authUser,placeholder:'username',okText:'Login'});
+    if(u===false) return false;
+    const p = await openModal({title:'Password',msg:'Password for '+u,showInput:true,placeholder:'password',okText:'Login'});
+    if(p===false) return false;
+    setAuth(String(u).trim(), String(p));
+    return true;
+  }
+  function connectWS(){
+    try{
+      const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const url = proto + location.hostname + ':81/';
+      wsSocket = new WebSocket(url);
+      wsSocket.onmessage = (ev)=>{
+        try{
+          const msg = JSON.parse(ev.data);
+          if(msg.type==='progress'){
+            // update matching qitem if visible
+            const el = document.querySelector(`.qitem__name`);
+            // generic toast for remote progress
+            // console.log('ws progress',msg);
+          } else if(msg.type==='status'){
+            renderStatus(msg.data);
+          }
+        }catch{}
+      };
+      wsSocket.onopen = ()=> console.log('[ws] connected');
+      wsSocket.onclose = ()=> setTimeout(connectWS, 5000);
+      wsSocket.onerror = ()=> {};
+    }catch{}
+  }
 
   // --- Helpers ---
   function fmtBytes(n){
@@ -164,15 +212,29 @@
   $('#sortSelect').addEventListener('change', e=>{ sortKey=e.target.value; renderFiles(); });
 
   // --- API wrappers (mock aware) ---
+  function withAuthHeaders(h={}){
+    const ah = authHeader();
+    if(ah) h['Authorization']=ah;
+    return h;
+  }
+  async function handleAuthFail(r){
+    if(r.status===401){
+      const ok = await promptAuth();
+      if(ok) return true;
+    }
+    return false;
+  }
   async function apiStatus(){
     if(useMock){ await new Promise(r=>setTimeout(r,120)); return structuredClone(MOCK_STATUS); }
-    const r=await fetch('/api/status',{cache:'no-store'});
+    const r=await fetch('/api/status',{cache:'no-store',headers:withAuthHeaders()});
+    if(r.status===401 && await handleAuthFail(r)){ return apiStatus(); }
     if(!r.ok) throw new Error('status '+r.status);
     return r.json();
   }
   async function apiList(path){
     if(useMock){ await new Promise(r=>setTimeout(r,100)); return {path, entries: structuredClone(MOCK_FS[path]||[])}; }
-    const r=await fetch('/api/list?path='+encodeURIComponent(path),{cache:'no-store'});
+    const r=await fetch('/api/list?path='+encodeURIComponent(path),{cache:'no-store',headers:withAuthHeaders()});
+    if(r.status===401 && await handleAuthFail(r)){ return apiList(path); }
     if(!r.ok) throw new Error('list '+r.status);
     return r.json();
   }
@@ -185,15 +247,18 @@
       if(url==='/api/rename'){ const from=normPath(data.from), to=normPath(data.to); const fd=parentPath(from), td=parentPath(to); const fn=from.slice(from.lastIndexOf('/')+1), tn=to.slice(to.lastIndexOf('/')+1); const ent=(MOCK_FS[fd]||[]).find(e=>e.name===fn); if(!ent) return {ok:false,error:'Not found'}; if((MOCK_FS[td]||[]).some(e=>e.name===tn)) return {ok:false,error:'Destination exists'}; MOCK_FS[fd]=MOCK_FS[fd].filter(e=>e.name!==fn); if(!MOCK_FS[td]) MOCK_FS[td]=[]; MOCK_FS[td].push({name:tn,dir:ent.dir,size:ent.size}); if(ent.dir){ MOCK_FS[to]=MOCK_FS[from]||[]; delete MOCK_FS[from]; } return {ok:true}; }
       if(url==='/api/eject') return {ok:true};
       if(url==='/api/wifi') return {ok:true};
+      if(url==='/api/auth/set') return {ok:true};
+      if(url==='/api/ota/sd') return {ok:true};
       return {ok:true};
     }
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data).toString()});
+    const r=await fetch(url,{method:'POST',headers:{...withAuthHeaders(),'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data).toString()});
+    if(r.status===401 && await handleAuthFail(r)){ return apiPostForm(url,data); }
     const j=await r.json().catch(()=>({ok:false,error:'Bad response'}));
     return j;
   }
   async function apiWifiScan(){
     if(useMock){ await new Promise(r=>setTimeout(r,500)); return {networks:[{ssid:'OfficeWifi',rssi:-46,secure:true},{ssid:'Guest',rssi:-62,secure:false},{ssid:'Lab-AP',rssi:-71,secure:true}]}; }
-    const r=await fetch('/api/wifi/scan',{cache:'no-store'}); if(!r.ok) throw new Error('scan '+r.status); return r.json();
+    const r=await fetch('/api/wifi/scan',{cache:'no-store',headers:withAuthHeaders()}); if(r.status===401 && await handleAuthFail(r)){ return apiWifiScan(); } if(!r.ok) throw new Error('scan '+r.status); return r.json();
   }
 
   // --- Status UI ---
@@ -225,6 +290,20 @@
     dot.classList.remove('is-ok','is-warn');
     if(useMock){ dot.classList.add('is-warn'); txt.textContent='Preview (no device)'; }
     else { dot.classList.add('is-ok'); txt.textContent=s.ssid? s.ssid+' · '+s.ip : (s.ip||'Connected'); }
+    // discovery
+    const disc=$('#discInfo'); if(disc && s.hostname) disc.textContent = s.hostname+'.local / '+s.hostname+'  (mDNS'+(s.discovery&&s.discovery.llmnr?' + LLMNR':'')+')';
+    // ota
+    const oc=$('#otaCurrent'); if(oc) oc.textContent = s.ota ? s.ota.version : (s.version||'—');
+    const enBadge=$('#otaEnabledBadge'); if(enBadge) enBadge.textContent = s.ota && s.ota.enabled ? 'OTA on' : 'OTA off';
+    const sdBox=$('#otaSDBox'); if(sdBox){
+      const avail = s.ota && s.ota.sdAvailable;
+      sdBox.classList.toggle('hidden', !avail);
+      if(avail){ $('#otaSDVer').textContent = s.ota.sdVersion||''; const n=$('#otaSDNotes'); if(n) n.textContent = ''; }
+    }
+    // auth indicator
+    if(s.auth && s.auth.required){
+      document.documentElement.setAttribute('data-auth','on');
+    }
   }
 
   async function refreshStatus(){
@@ -360,10 +439,20 @@
   });
 
   // --- File actions ---
-  function doDownload(ent){
+  async function doDownload(ent){
     const url='/api/download?path='+encodeURIComponent(joinPath(curPath, ent.name));
     if(useMock){ toast('Mock: download '+ent.name,'warn'); return; }
-    // trigger download via anchor
+    const ah=authHeader();
+    if(ah){
+      try{
+        const r=await fetch(url,{headers:{'Authorization':ah}});
+        if(r.status===401){ if(await promptAuth()) return doDownload(ent); else return; }
+        if(!r.ok) throw new Error('download '+r.status);
+        const blob=await r.blob();
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=ent.name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        return;
+      }catch(e){ toast('Download failed: '+e.message,'error'); return; }
+    }
     const a=document.createElement('a'); a.href=url; a.download=ent.name; document.body.appendChild(a); a.click(); a.remove();
   }
 
@@ -487,6 +576,7 @@
     return new Promise((resolve)=>{
       const xhr=new XMLHttpRequest();
       xhr.open('POST','/api/upload?path='+encodeURIComponent(curPath));
+      const ah = authHeader(); if(ah) xhr.setRequestHeader('Authorization', ah);
       xhr.upload.onprogress=e=>{
         if(e.lengthComputable){
           const pct=Math.round(e.loaded/e.total*100);
@@ -590,6 +680,69 @@
     else toast(r.error||'Save failed','error');
   });
 
+  // --- Auth ---
+  const authForm = $('#authForm');
+  if(authForm){
+    // prefill user from status
+    authForm.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const user=$('#authUser').value.trim();
+      const p1=$('#authPass').value;
+      const p2=$('#authPass2').value;
+      if(!user || !p1){ toast('User and password required','error'); return; }
+      if(p1 !== p2){ toast('Passwords do not match','error'); return; }
+      const ok=await openModal({title:'Save login?',msg:'You will need to log in with "'+user+'" after reboot.',okText:'Save'});
+      if(!ok) return;
+      const r=await apiPostForm('/api/auth/set',{user,pass:p1});
+      if(r.ok){ toast('Login saved — device keeps it'); setAuth(user,p1); $('#authPass').value=''; $('#authPass2').value=''; $('#authStatus').textContent='Saved'; }
+      else toast(r.error||'Save failed','error');
+    });
+  }
+
+  // --- OTA ---
+  const otaFile = $('#otaFile');
+  const otaFileName = $('#otaFileName');
+  const otaBar = $('#otaBar');
+  const otaProgress = $('#otaProgress');
+  if(otaFile){
+    otaFile.addEventListener('change', async e=>{
+      const f=e.target.files[0]; if(!f) return;
+      otaFileName.textContent = f.name + ' ('+fmtBytes(f.size)+')';
+      const ok=await openModal({title:'Flash firmware?',msg:f.name+' '+fmtBytes(f.size)+' — device will reboot after.',okText:'Flash'});
+      if(!ok){ e.target.value=''; return; }
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST','/api/ota');
+      const ah=authHeader(); if(ah) xhr.setRequestHeader('Authorization', ah);
+      xhr.upload.onprogress=ev=>{
+        if(ev.lengthComputable){
+          const pct=Math.round(ev.loaded/ev.total*100);
+          otaProgress.classList.remove('hidden');
+          otaBar.style.width=pct+'%';
+        }
+      };
+      xhr.onload=()=>{
+        let j=null; try{ j=JSON.parse(xhr.responseText);}catch{}
+        if(xhr.status>=200&&xhr.status<300 && j&&j.ok){ toast('OTA done — rebooting'); otaBar.style.width='100%'; }
+        else toast(j&&j.error?j.error:'OTA failed ('+xhr.status+')','error');
+        e.target.value='';
+      };
+      xhr.onerror=()=>{ toast('OTA network error','error'); e.target.value=''; };
+      const fd=new FormData(); fd.append('file', f, f.name);
+      otaProgress.classList.remove('hidden'); otaBar.style.width='0';
+      xhr.send(fd);
+    });
+  }
+  const otaSDTrigger=$('#otaSDTrigger');
+  if(otaSDTrigger){
+    otaSDTrigger.addEventListener('click', async()=>{
+      otaSDTrigger.disabled=true;
+      const r=await apiPostForm('/api/ota/sd',{});
+      otaSDTrigger.disabled=false;
+      if(r.ok) toast('SD OTA triggered — rebooting');
+      else toast(r.error||'SD OTA failed','error');
+    });
+  }
+
   // --- Init ---
   async function init(){
     initTheme();
@@ -599,6 +752,9 @@
     try{
       const s=await apiStatus();
       useMock=false; renderStatus(s);
+      // prefill auth user
+      if(s.auth && s.auth.user){ const au=$('#authUser'); if(au && !au.value) au.value=s.auth.user; }
+      connectWS();
     }catch(err){
       useMock=true;
       console.warn('[PrintDrop] /api/status failed — entering mock preview mode', err);
@@ -606,7 +762,7 @@
       toast('Preview mode — no device found, showing mock data','warn');
     }
     await loadPath('/');
-    // poll every 5s (hard constraint — never faster)
+    // poll every 5s (hard constraint — never faster) — WS pushes supplement this
     pollTimer=setInterval(refreshStatus, 5000);
   }
   // respect reduced motion already via CSS; no JS needed

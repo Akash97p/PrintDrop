@@ -19,6 +19,10 @@
 #include "net.h"
 #include "storage.h"
 #include "web.h"
+#include "led.h"
+#include "button.h"
+#include "auth.h"
+#include "ota.h"
 
 // Serial console on UART0. The web setup portal is the normal route, but a
 // headless device on a bench is far easier to provision over the wire — and it
@@ -49,7 +53,11 @@ static void handleCommand(String line) {
         Serial.println("  status                 show device state");
         Serial.println("  wifi <ssid> <password> join a network and reboot");
         Serial.println("  hostname <name>        set the mDNS name and reboot");
+        Serial.println("  auth <user> <pass>     set web UI login and reboot");
+        Serial.println("  passwd <pass>          set password for current user");
         Serial.println("  forget                 clear Wi-Fi settings and reboot");
+        Serial.println("  clear-auth             reset web auth to defaults");
+        Serial.println("  factory-reset          clear Wi-Fi + auth and reboot");
         Serial.println("  reboot                 restart");
         Serial.println("  BOOTLOADER             reboot into flash download mode");
 
@@ -57,12 +65,15 @@ static void handleCommand(String line) {
         Serial.printf("mode      : %s\n", net::isAccessPoint() ? "access point" : "station");
         Serial.printf("ssid      : %s\n", net::currentSsid().c_str());
         Serial.printf("hostname  : %s.local\n", net::hostname().c_str());
+        Serial.printf("hostname2 : http://%s/  (mDNS+LLMNR)\n", net::hostname().c_str());
         Serial.printf("ip        : %s\n", net::localIp().toString().c_str());
         Serial.printf("rssi      : %d dBm\n", (int)net::rssi());
         Serial.printf("card      : %s\n", storage::cardMounted() ? "mounted" : "absent");
         Serial.printf("sd bus    : %s %u-bit @ %u Hz\n", storage::busMode(), storage::busWidth(), storage::busFrequency());
         Serial.printf("usb host  : %s\n", storage::usbHostPresent() ? "connected" : "none");
         Serial.printf("usb media : %s\n", storage::usbMediaPresent() ? "presented" : "withdrawn");
+        Serial.printf("auth      : %s user=%s\n", auth::isRequired() ? "on" : "off", auth::currentUser().c_str());
+        Serial.printf("version   : %s ota %s\n", ota::currentVersion().c_str(), PRINTDROP_ENABLE_OTA ? "on" : "off");
 
     } else if (cmd == "wifi") {
         // The password may contain spaces, so only the first token is the SSID.
@@ -86,6 +97,32 @@ static void handleCommand(String line) {
         delay(300);
         ESP.restart();
 
+    } else if (cmd == "auth") {
+        int sp2 = rest.indexOf(' ');
+        if (sp2 <= 0) { Serial.println("usage: auth <user> <pass>"); return; }
+        String user = rest.substring(0, sp2);
+        String pass = rest.substring(sp2+1);
+        pass.trim(); user.trim();
+        if (auth::setCredentials(user, pass)) { Serial.println("auth saved, restarting"); delay(300); ESP.restart(); }
+        else Serial.println("auth save failed");
+
+    } else if (cmd == "passwd") {
+        if (rest.isEmpty()) { Serial.println("usage: passwd <newPass>"); return; }
+        String user = auth::currentUser();
+        if (auth::setCredentials(user, rest)) { Serial.println("password saved, restarting"); delay(300); ESP.restart(); }
+        else Serial.println("save failed");
+
+    } else if (cmd == "clear-auth") {
+        auth::clear();
+        Serial.println("auth reset to defaults, restarting");
+        delay(300); ESP.restart();
+
+    } else if (cmd == "factory-reset") {
+        net::Config c; net::saveConfig(c);
+        auth::clear();
+        Serial.println("factory reset — Wi-Fi + auth cleared, restarting");
+        delay(300); ESP.restart();
+
     } else if (cmd == "reboot") {
         ESP.restart();
 
@@ -106,6 +143,21 @@ static void pollConsole() {
     }
 }
 
+static void onButtonShort() {
+    Serial.println("[btn] short press — refreshing printer view");
+    storage::refreshHostView();
+}
+
+static void onButtonLong() {
+    Serial.println("[btn] long press 5s — factory reset");
+    net::Config c; net::saveConfig(c);
+    auth::clear();
+    // Blink error pattern before reboot
+    led::setError(true);
+    delay(800);
+    ESP.restart();
+}
+
 static void banner() {
     Serial.println();
     Serial.println("=====================================");
@@ -121,12 +173,24 @@ static void banner() {
     Serial.printf("SD pins CS=%d MISO=%d MOSI=%d CLK=%d\n",
                   SD_CS_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CLK_PIN);
 #endif
+#if PRINTDROP_LED_PIN >= 0
+    Serial.printf("LED: GPIO %d %s, Button: GPIO %d %s\n",
+                  PRINTDROP_LED_PIN, PRINTDROP_LED_ACTIVE_HIGH ? "active-high" : "active-low",
+                  PRINTDROP_BUTTON_PIN, PRINTDROP_BUTTON_ACTIVE_LOW ? "active-low" : "active-high");
+#endif
+    Serial.printf("Auth: %s user=%s, OTA %s\n",
+                  auth::isRequired() ? "on" : "off", auth::currentUser().c_str(),
+                  PRINTDROP_ENABLE_OTA ? "on" : "off");
     Serial.println("Type 'help' for serial commands.");
 }
 
 void setup() {
     UART_CONSOLE.begin(115200);
     delay(1200);
+    // Init auth before banner so banner can report user
+    auth::begin();
+    led::begin();
+    button::begin(onButtonShort, onButtonLong);
     banner();
 
     if (!storage::begin()) {
@@ -134,15 +198,27 @@ void setup() {
         // comes up so the device can be reached and diagnosed.
         Serial.println("[sd] FATAL: no usable card.");
         Serial.println("[sd] If the module has an AMS1117 regulator, VCC must be 3V3.");
+#ifdef USE_SDIO
+        Serial.println("[sd] Check CLK/CMD/D0-D3 against the pins above; SDIO needs pull-ups.");
+#else
         Serial.println("[sd] Check CS/MISO/MOSI/CLK against the pins above.");
+#endif
+        led::setError(true);
+    } else {
+        // Quick SD OTA check at boot (no block)
+        String v;
+        if (ota::checkSD(&v, nullptr)) {
+            Serial.printf("[ota] SD update available: %s -> %s\n", PRINTDROP_VERSION, v.c_str());
+        }
     }
 
     const bool joined = net::begin();
     web::begin();
 
     if (joined) {
-        Serial.printf("[ready] http://%s.local  or  http://%s\n",
-                      net::hostname().c_str(), net::localIp().toString().c_str());
+        Serial.printf("[ready] http://%s.local  http://%s/  or  http://%s\n",
+                      net::hostname().c_str(), net::hostname().c_str(), net::localIp().toString().c_str());
+        Serial.printf("[ready] LLMNR: http://%s/  mDNS: http://%s.local/\n", net::hostname().c_str(), net::hostname().c_str());
     } else {
         Serial.printf("[ready] setup portal at http://%s (join \"%s\")\n",
                       net::localIp().toString().c_str(), AP_SSID_PREFIX);
@@ -152,6 +228,8 @@ void setup() {
 void loop() {
     web::loop();
     net::loop();
+    led::loop();
+    button::loop();
     // Owns the UART instead of reflashHatchPoll(), so BOOTLOADER and the
     // provisioning commands do not fight over the same input stream.
     pollConsole();

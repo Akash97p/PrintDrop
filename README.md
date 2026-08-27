@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="assets/printdrop_banner.webp" alt="PrintDrop" width="620">
+<picture>
+  <source srcset="assets/printdrop_banner_dark.webp" media="(prefers-color-scheme: dark)">
+  <img src="assets/printdrop_banner.webp" alt="PrintDrop" width="620">
+</picture>
 
 **A Wi-Fi flash drive for 3D printers.**
 Drop a print job from your desk instead of walking a USB stick to the machine.

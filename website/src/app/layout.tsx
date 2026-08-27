@@ -20,21 +20,36 @@ export const metadata: Metadata = {
   title: "PrintDrop — a Wi-Fi flash drive for 3D printers",
   description:
     "PrintDrop plugs into a 3D printer's USB port and appears as an ordinary flash drive, while also serving a web UI over Wi-Fi. Drop a print job from your desk instead of carrying a USB stick.",
-  icons: { icon: `${basePath}/logo.webp` },
+  icons: {
+    icon: [
+      { url: `${basePath}/favicon.ico` },
+      { url: `${basePath}/favicon-32x32.png`, sizes: "32x32", type: "image/png" },
+      { url: `${basePath}/logo.webp`, sizes: "512x512", type: "image/webp" },
+    ],
+    apple: [{ url: `${basePath}/apple-touch-icon.png`, sizes: "180x180", type: "image/png" }],
+  },
+  manifest: `${basePath}/site.webmanifest`,
   openGraph: {
     title: "PrintDrop — a Wi-Fi flash drive for 3D printers",
     description:
       "Drop a print job from your desk instead of carrying a USB stick to the machine.",
     url: "/",
     type: "website",
-    images: ["/banner.webp"],
+    images: [
+      {
+        url: "/og.webp",
+        width: 1200,
+        height: 630,
+        alt: "PrintDrop — a Wi-Fi flash drive for 3D printers",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "PrintDrop",
     description:
       "Drop a print job from your desk instead of carrying a USB stick to the machine.",
-    images: ["/banner.webp"],
+    images: ["/og.webp"],
   },
 }
 

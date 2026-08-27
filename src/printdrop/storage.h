@@ -28,7 +28,12 @@ uint64_t usedBytes();
 uint64_t freeBytes();
 uint32_t sectorCount();
 uint32_t sectorSize();
+// Bus clock currently in use (SPI Hz or SDMMC Hz). Kept as spiFrequency()
+// for backwards compatibility; prefer busFrequency().
 uint32_t spiFrequency();
+uint32_t busFrequency();
+const char* busMode();      // "sdio-4bit", "sdio-1bit", or "spi"
+uint32_t busWidth();        // 1 or 4 (SDIO), or 1 (SPI)
 
 // True while a USB host is attached and not suspended.
 bool usbHostPresent();

@@ -32,15 +32,37 @@ logging goes to the UART bridge.
 
 ## SD wiring
 
+### SDIO 4-bit — `feat/sdio` (recommended, 6 wires)
+
+| Signal | GPIO | Notes |
+|--------|------|-------|
+| CLK    | 40   | |
+| CMD    | 14   | 10 k pull-up to 3V3 |
+| D0     | 39   | 10 k pull-up to 3V3 |
+| D1     | 12   | 10 k pull-up to 3V3 |
+| D2     | 13   | 10 k pull-up to 3V3 |
+| D3     | 15   | 10 k pull-up to 3V3 |
+
+Reuses the four SPI pins plus two new data lines — an SPI-wired board migrates by adding D2/D3 and pull-ups. Requires a **3.3 V-native microSD breakout** (no AMS1117/LC125) with the pull-ups listed above. CLK/CMD/D0 can be validated in 1-bit mode (`SDMMC_WIDTH=1`) before wiring D1-D3. Set through `build_flags` in `platformio.ini`, with matching defaults in `src/printdrop/config.h` (`SDMMC_*_PIN`, `SDMMC_FREQ`, `SDMMC_WIDTH`).
+
+```
+# feat/sdio — SDIO is the default
+pio run -e printdrop        # SDIO 4-bit @ 40 MHz
+pio run -e diag_sdio        # SDIO throughput sweep
+
+# legacy — SPI without re-wiring
+pio run -e printdrop_spi    # SPI @ 20 MHz
+pio run -e diag             # SPI speed sweep
+```
+
+### SPI — `main` legacy (4 wires)
+
 | Signal | GPIO |
 |--------|------|
 | CS     | 12   |
 | MISO   | 39   |
 | MOSI   | 14   |
 | CLK    | 40   |
-
-Set through `build_flags` in `platformio.ini`, with matching defaults in
-`src/printdrop/config.h`.
 
 ## Power: use 3V3
 
@@ -88,6 +110,34 @@ Every speed verified clean; throughput saturates around 20 MHz at ~910 KB/s.
 [bugs.md](bugs.md#sd-cards-must-be-identified-at-400-khz) — the card must be
 identified slowly before the clock is raised, regardless of what it sustains
 afterwards.
+
+## SDIO clocks — `feat/sdio` (projected)
+
+The `diag_sdio` environment sweeps the SDMMC host at 10/20/40 MHz in both 1-bit
+and 4-bit modes, verifying each step with the same sector-0 probe. On jumper
+wiring the ESP32-S3 SDMMC host sustains 20 MHz cleanly; 40 MHz wants short,
+equal-length wires and solid pull-ups. Expected deltas over SPI:
+
+| Bus | Clock | Raw SD | USB read | USB write | 20 MB upload |
+|-----|-------|--------|----------|-----------|--------------|
+| SPI 1-bit | 20 MHz | ~910 KB/s | 485 KB/s | 248 KB/s | ~80 s |
+| SDIO 1-bit | 20 MHz | ~1 800 KB/s | ~1 200 KB/s | ~900 KB/s | ~22 s |
+| **SDIO 4-bit** | **20 MHz** | **~3 500 KB/s** | **~3 200 KB/s** | **~2 000 KB/s** | **~6 s** |
+| SDIO 4-bit | 40 MHz | ~6 000 KB/s | ~5 000 KB/s * | ~3 500 KB/s * | ~4 s |
+
+\* SDIO 4-bit @ 40 MHz is the SDHC high-speed ceiling — jumper wires may need to stay at 20 MHz. Re-measure after wiring. `SDMMC_FREQ` defaults to 40 MHz; step down to 20 MHz if the probe fails.
+
+1-bit SDIO is already ~2× SPI and useful for bring-up (only CLK/CMD/D0 needed);
+4-bit multiplies that by ~4. See [architecture.md](architecture.md#measured-performance) for the bottleneck note.
+
+## LED and button — `feat/ux`
+
+| Signal | GPIO | Notes |
+|--------|------|-------|
+| LED    | 38   | Active-high by default (`PRINTDROP_LED_PIN`, `PRINTDROP_LED_ACTIVE_HIGH`). Idle: 100 ms on / 1900 ms off (2 s period). Activity (SD/USB busy): 100 ms toggle (200 ms period). Error: double-blink. |
+| Button | 4    | Active-low, internal pull-up (`PRINTDROP_BUTTON_PIN`). Short press (<5 s): `storage::refreshHostView()` (eject). Long press ≥5 s: factory reset (clears `printdrop` NVS `ssid`/`pass`/`host`/`auth_*` and reboots). |
+
+Both are `#ifndef`-overrideable via `build_flags` `platformio.ini:150`. Set to `-1` to disable. See `src/printdrop/led.*` / `button.*` and `config.h:84`.
 
 ## Card under test
 

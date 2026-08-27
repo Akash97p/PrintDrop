@@ -8,15 +8,20 @@ and that is the whole design problem.
 
 ```
 src/printdrop/
-  main.cpp        startup, serial console
-  config.h        pins, timeouts, AP credentials
-  storage.cpp     SD card and USB mass storage arbitration
-  net.cpp         Wi-Fi provisioning, mDNS, static IP
-  web.cpp         HTTP server and JSON file API
+  main.cpp        startup, serial console, button/LED
+  config.h        pins, bus, auth, OTA, LED, timeouts
+  storage.cpp     SD card and USB mass storage arbitration (SPI/SDIO)
+  net.cpp         Wi-Fi provisioning, mDNS + LLMNR, static IP
+  web.cpp         HTTP server + WebSocket (port 81) + JSON file API
+  auth.cpp        SHA-256 Basic auth, NVS store
+  ota.cpp         HTTP + SD-card OTA (Update)
+  ws.cpp          WebSocket broadcaster (progress/status)
+  led.cpp         heartbeat / activity LED
+  button.cpp      eject + factory-reset button
 src/diag/         SD and USB diagnostics
 src/legacy/       USB mass storage only, no networking
 src/common/       shared helpers (reflash hatch)
-data/             web UI, flashed to LittleFS
+data/             web UI, flashed to LittleFS (now WS + auth + OTA)
 ```
 
 ## Sharing the card
@@ -71,26 +76,30 @@ Credentials live in NVS via `Preferences`, never in the source tree. On boot:
    raise a WPA2 access point (`PrintDrop-Setup`) serving the same UI.
 2. Otherwise join as a station, optionally with a static IP.
 
-Either way mDNS is started, so `http://printdrop.local` resolves.
+Either way mDNS (`http://printdrop.local`) **and** LLMNR (`http://printdrop`, single-label for Windows) are started on the same hostname via a minimal UDP 5355 responder (`net.cpp:74`). See `docs/discovery.md`.
 
-A serial console on UART0 (`help`, `status`, `wifi`, `hostname`, `forget`,
-`reboot`) provides headless provisioning without putting secrets in the repo.
+A serial console on UART0 (`help`, `status`, `wifi`, `hostname`, `auth`/`passwd`/`clear-auth`/`factory-reset`, `forget`, `reboot`) provides headless provisioning without putting secrets in the repo. `auth` and `ota` state are also in `status` (`auth {user}` `ota {version}` `discovery {mdns,llmnr}`).
 
 ## Web layer
 
-A synchronous `WebServer` on port 80. The UI is static files from LittleFS,
-pre-compressed copies preferred when present; everything else is a small JSON
-API.
+A synchronous `WebServer` on port 80 + a `WebSocketsServer` on port 81. The UI is static files from LittleFS, pre-compressed copies preferred when present; everything else is a small JSON API (protected by Basic auth when `PRINTDROP_AUTH_REQUIRED=1`).
 
-| Endpoint | Method | Notes |
-|---|---|---|
-| `/api/status` | GET | device, card, USB and network state |
-| `/api/list` | GET | directory listing |
-| `/api/upload` | POST | multipart; target directory in `?path=` |
-| `/api/download` | GET | streams a file |
-| `/api/delete`, `/api/mkdir`, `/api/rename` | POST | form-encoded |
-| `/api/eject` | POST | withdraw and re-present the media |
-| `/api/wifi/scan`, `/api/wifi` | GET / POST | provisioning |
+| Endpoint | Method | Auth | Notes |
+|---|---|---|---|
+| `/api/status` | GET | — | device, card, USB, network, `auth`, `discovery`, `ota`, `wsPort` |
+| `/api/list` | GET | Basic | directory listing |
+| `/api/upload` | POST | Basic | multipart; `?path=` + WS progress `ws://:81` |
+| `/api/download` | GET | Basic | streams a file |
+| `/api/delete`, `/api/mkdir`, `/api/rename` | POST | Basic | form-encoded |
+| `/api/eject` | POST | Basic | withdraw and re-present the media |
+| `/api/wifi/scan`, `/api/wifi` | GET / POST | Basic | provisioning |
+| `/api/auth/status` | GET | — | `{required,user}` |
+| `/api/auth/set` | POST | Basic | `user`+`pass` → SHA-256 NVS |
+| `/api/ota/status` | GET | Basic | `{current,sdAvailable,sdVersion}` |
+| `/api/ota` | POST | Basic | raw `.bin` → `Update` + reboot |
+| `/api/ota/sd` | POST | Basic | flash `SD:/firmware.bin` per `firmware.json` |
+
+WS on `:81` broadcasts `{"type":"progress",...}` and `{"type":"status",data:{...}}`. Auth is HTTP Basic, SHA-256 hex in NVS (`auth_user`/`auth_hash`), seeded from `platformio.ini` `PRINTDROP_AUTH_*` (`docs/auth.md`). LED idle/activity/error blink and button eject/factory-reset are handled in `main.cpp` + `led.cpp`/`button.cpp`.
 
 Client-supplied paths go through `safePath()`, which rejects anything
 containing `..` and normalises separators.
@@ -108,10 +117,12 @@ upload callback.
 
 | Env | Sources | USB mode | Purpose |
 |---|---|---|---|
-| `printdrop` | `src/printdrop/` | TinyUSB | The product |
+| `printdrop` | `src/printdrop/` | TinyUSB | The product — **SDIO 4-bit** (`feat/sdio` default) |
+| `printdrop_spi` | `src/printdrop/` | TinyUSB | The product — **SPI legacy** (4-wire, no re-wire) |
 | `msc` | `src/legacy/` | TinyUSB | USB mass storage only, no networking |
 | `ramdisk` | `src/diag/msc_ramdisk.cpp` | TinyUSB | RAM-backed FAT12 volume; proves USB MSC without the SD card |
 | `diag` | `src/diag/sd_diag.cpp` | Serial/JTAG | SPI speed sweep, geometry, MBR dump, root listing |
+| `diag_sdio` | `src/diag/sd_diag.cpp` | Serial/JTAG | **SDIO 4-bit** bring-up, bus width + throughput sweep |
 | `scan` | `src/diag/sd_scan.cpp` | Serial/JTAG | Pin health, line voltages, pin-permutation sweep |
 
 The diagnostic environments deliberately keep `ARDUINO_USB_MODE=1` so the native
@@ -123,30 +134,36 @@ path is proven good and any remaining fault is on the SD side.
 
 ## Partitions
 
-4 MB flash, single app image — there is no room for two OTA slots.
+4 MB flash — `feat/ux` uses dual OTA slots so HTTP/SD update does not brick the stick.
 
 | Partition | Offset | Size | Holds |
 |---|---|---|---|
-| `nvs` | `0x9000` | 20 KB | Wi-Fi credentials, hostname |
-| `app0` | `0x10000` | 2688 KB | firmware (~900 KB used) |
+| `nvs` | `0x9000` | 20 KB | Wi-Fi, hostname, `auth_*` |
+| `otadata` | `0xE000` | 8 KB | OTA slot selection |
+| `app0` | `0x10000` | 1344 KB | firmware ota_0 (~980 KB used) |
+| `app1` | `0x160000` | 1344 KB | firmware ota_1 |
 | `spiffs` (LittleFS) | `0x2B0000` | 1280 KB | web UI (~62 KB used) |
 | `coredump` | `0x3F0000` | 64 KB | crash dumps |
 
-The LittleFS partition is named `spiffs` because that is the label
-`LittleFS.begin()` looks for by default, and what PlatformIO's `uploadfs`
-targets.
+`partitions_printdrop_ota.csv` (`platformio.ini:25` per-env) is the OTA layout. The `LittleFS` partition keeps label `spiffs` because that is what `LittleFS.begin()` looks for and what `uploadfs` targets. `printdrop_spi` retains the old single-app `partitions_printdrop.csv` for bring-up without OTA. Disable OTA on tight builds with `-D PRINTDROP_ENABLE_OTA=0` (`config.h:135`).
 
 ## Measured performance
 
-| Path | Throughput |
-|---|---|
-| USB read (uncached) | 485 KB/s |
-| USB write | 248 KB/s |
-| Raw SD SPI | ~910 KB/s |
+| Path | Throughput | Bus |
+|---|---|---|
+| USB read (uncached) | 485 KB/s | SPI @ 20 MHz |
+| USB write | 248 KB/s | SPI @ 20 MHz |
+| Raw SD | ~910 KB/s | SPI @ 20 MHz |
 
-Bounded by driving the card in SPI mode rather than 4-bit SDIO. A 20 MB print
-job takes roughly 80 seconds to upload; the card, not the network, is the
-bottleneck.
+On `feat/sdio` (SDIO 4-bit) the same host at the same clock is ~3-4×
+faster — projected 3 200 KB/s read / 2 000 KB/s write / 3 500 KB/s raw
+at 20 MHz, so a 20 MB print job drops from ~80 s to ~6 s. The SDMMC host
+at 40 MHz can reach ~6 000 KB/s raw on a short breakout; see
+[hardware.md](hardware.md#sdio-clocks--featsdio-projected).
+
+On `main` the path is bounded by driving the card in SPI mode rather than
+4-bit SDIO — the card, not the network, is the bottleneck. `feat/sdio`
+removes that bound.
 
 Verified end to end over USB: a 2 MB write survives a SHA-256 round trip
 (`6EA73B45…C562` identical both sides), and the ESP32's own directory listing

@@ -2,6 +2,7 @@
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <WiFiUdp.h>
 #include <Preferences.h>
 
 #include "config.h"
@@ -65,13 +66,98 @@ bool applyStaticIp(const Config& c) {
 }
 
 void startMdns(const String& host) {
+#if PRINTDROP_ENABLE_MDNS
     if (!MDNS.begin(host.c_str())) {
         log("[net] mDNS failed to start");
-        return;
+    } else {
+        MDNS.addService("http", "tcp", 80);
+        MDNS.addServiceTxt("http", "tcp", "path", "/");
+        log("[net] mDNS: http://%s.local", host.c_str());
     }
-    MDNS.addService("http", "tcp", 80);
-    log("[net] discoverable as http://%s.local", host.c_str());
+#else
+    (void)host;
+#endif
 }
+
+#if PRINTDROP_ENABLE_LLMNR
+WiFiUDP llmnrUdp;
+bool    llmnrRunning = false;
+
+void startLlmnr(const String& host) {
+    // LLMNR answers single-label names (http://printdrop) on Windows without
+    // Bonjour. Minimal UDP responder on 5355, unicast answer.
+    if (llmnrRunning) { llmnrUdp.stop(); llmnrRunning = false; }
+    if (host.isEmpty()) return;
+    if (!llmnrUdp.beginMulticast(IPAddress(224,0,0,252), 5355)) {
+        // Fallback unicast
+        if (!llmnrUdp.begin(5355)) {
+            log("[net] LLMNR: failed to bind 5355");
+            return;
+        }
+    }
+    llmnrRunning = true;
+    log("[net] LLMNR: http://%s (single-label)", host.c_str());
+}
+
+void pollLlmnr(const String& host) {
+    if (!llmnrRunning) return;
+    int sz = llmnrUdp.parsePacket();
+    if (sz <= 0) return;
+    uint8_t buf[512];
+    int len = llmnrUdp.read(buf, sizeof(buf));
+    if (len < 12) return;
+    // DNS header: ID 2, flags 2, QDCOUNT 2, AN 2, NS 2, AR 2
+    uint16_t qd = (buf[4] << 8) | buf[5];
+    if (qd == 0) return;
+    // Parse QNAME
+    int pos = 12;
+    String qname;
+    while (pos < len && buf[pos] != 0) {
+        uint8_t l = buf[pos++];
+        if (pos + l > len) return;
+        if (!qname.isEmpty()) qname += ".";
+        for (uint8_t i=0;i<l;++i) qname += (char)tolower(buf[pos+i]);
+        pos += l;
+    }
+    if (pos >= len) return;
+    pos++; // null
+    if (pos + 4 > len) return;
+    uint16_t qtype = (buf[pos]<<8)|buf[pos+1];
+    uint16_t qclass = (buf[pos+2]<<8)|buf[pos+3];
+    // Only A / ANY
+    if (qtype != 1 && qtype != 255) return;
+    if (qclass != 1 && qclass != 255) return;
+    String hostL = host; hostL.toLowerCase();
+    String hostLocal = hostL + ".local";
+    qname.toLowerCase();
+    if (qname != hostL && qname != hostLocal) return;
+    // Build response: copy header, set QR=1, AA=1, copy question, add answer
+    uint8_t resp[512];
+    memcpy(resp, buf, len);
+    resp[2] |= 0x80; // QR
+    resp[2] |= 0x04; // AA
+    resp[3] &= ~0x0F; // RCODE 0
+    // ANCOUNT = 1
+    resp[6]=0; resp[7]=1;
+    int rpos = len;
+    // Answer: pointer to QNAME (0xC0 0x0C), type A, class IN, TTL 30, RDLEN 4, RDATA IP
+    if (rpos + 16 > (int)sizeof(resp)) return;
+    resp[rpos++]=0xC0; resp[rpos++]=0x0C;
+    resp[rpos++]=0x00; resp[rpos++]=0x01; // A
+    resp[rpos++]=0x00; resp[rpos++]=0x01; // IN
+    resp[rpos++]=0x00; resp[rpos++]=0x00; resp[rpos++]=0x00; resp[rpos++]=0x1E; // 30s
+    resp[rpos++]=0x00; resp[rpos++]=0x04;
+    IPAddress ip = WiFi.localIP();
+    if (ip == IPAddress(0,0,0,0)) ip = WiFi.softAPIP();
+    resp[rpos++]=ip[0]; resp[rpos++]=ip[1]; resp[rpos++]=ip[2]; resp[rpos++]=ip[3];
+    llmnrUdp.beginPacket(llmnrUdp.remoteIP(), llmnrUdp.remotePort());
+    llmnrUdp.write(resp, rpos);
+    llmnrUdp.endPacket();
+}
+#else
+void startLlmnr(const String&) {}
+void pollLlmnr(const String&) {}
+#endif
 
 }  // namespace
 
@@ -85,6 +171,7 @@ bool begin() {
         log("[net] no network configured");
         startAccessPoint();
         startMdns(active.hostname);
+        startLlmnr(active.hostname);
         return false;
     }
 
@@ -104,6 +191,7 @@ bool begin() {
         WiFi.disconnect(true);
         startAccessPoint();
         startMdns(active.hostname);
+        startLlmnr(active.hostname);
         return false;
     }
 
@@ -113,12 +201,13 @@ bool begin() {
     log("[net] joined \"%s\" as %s (%d dBm)",
         active.ssid.c_str(), WiFi.localIP().toString().c_str(), (int)WiFi.RSSI());
     startMdns(active.hostname);
+    startLlmnr(active.hostname);
+    log("[net] also at http://%s/ and http://%s.local/ (mDNS+LLMNR)", active.hostname.c_str(), active.hostname.c_str());
     return true;
 }
 
 void loop() {
-    // ESPmDNS on this core needs no periodic servicing; kept as the hook for
-    // any future connection babysitting.
+    pollLlmnr(active.hostname);
 }
 
 bool      isAccessPoint() { return apMode; }

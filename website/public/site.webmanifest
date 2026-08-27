@@ -1,0 +1,25 @@
+{
+  "name": "PrintDrop",
+  "short_name": "PrintDrop",
+  "description": "A Wi-Fi flash drive for 3D printers",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#030303",
+  "background_color": "#030303",
+  "display": "standalone"
+}

@@ -99,6 +99,7 @@ void sendCorsHeaders() {
     }
     server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     server.sendHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    server.sendHeader("Access-Control-Allow-Private-Network", "true");
     server.sendHeader("Access-Control-Max-Age", "86400");
 }
 

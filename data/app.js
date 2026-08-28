@@ -420,7 +420,7 @@
           o.addEventListener('click',()=>loadPath(joinPath(curPath, ent.name))); actTd.appendChild(o);
         }
         const rn=document.createElement('button'); rn.className='btn btn--ghost'; rn.type='button'; rn.textContent='Rename'; rn.addEventListener('click',()=>doRename(ent)); actTd.appendChild(rn);
-        const del=document.createElement('button'); del.className='btn btn--ghost'; dl && (del.style.marginLeft='0'); del.type='button'; del.textContent='Delete'; del.setAttribute('aria-label','Delete '+ent.name);
+        const del=document.createElement('button'); del.className='btn btn--ghost'; del.type='button'; del.textContent='Delete'; del.setAttribute('aria-label','Delete '+ent.name);
         del.addEventListener('click',()=>doDelete(ent)); actTd.appendChild(del);
         tr.append(nameTd,sizeTd,typeTd,actTd); tbody.appendChild(tr);
       });

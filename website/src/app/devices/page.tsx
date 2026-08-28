@@ -135,7 +135,7 @@ export default function DevicesPage() {
     const uniq = [...new Set(candidates)];
     addLog(`Probing ${uniq.length} candidates…`);
     if (isHttps) {
-      addLog("⚠ Page is https but device is http — browsers block this (mixed content). If scan stays empty, open the standalone scanner via file:// or http.");
+      addLog("ℹ https→http private network — Chrome will ask “Allow local network access?” on first scan. Click Allow. Firefox/Safari: use file:// scanner.");
     }
 
     const results: FoundDevice[] = [];
@@ -228,10 +228,11 @@ async function addIp(){await scan();}
                 This page is https, the device is http
               </CardTitle>
               <CardDescription className="text-amber-800 dark:text-amber-200">
-                Browsers block <code>https://github.io</code> → <code>http://printdrop.local</code> (mixed content). The scan will stay empty
-                until you open a <code>http</code> version: download the standalone scanner below and open it via{" "}
-                <code>file://</code> (double-click), or host it on <code>http</code> on your LAN. Direct links to the device
-                (below) still work.
+                <strong>Chrome/Edge:</strong> first <em>Scan</em> will trigger a one-click prompt “Allow this site to access your local network?”
+                — click <strong>Allow</strong> and the scan will work (via Private Network Access). The stick now sends{" "}
+                <code>Access-Control-Allow-Private-Network: true</code>. <br />
+                <strong>Firefox/Safari</strong> don’t support that yet — download the standalone scanner below and open it via{" "}
+                <code>file://</code> (double-click). Direct <code>http://printdrop.local</code> links below always work.
               </CardDescription>
             </CardHeader>
           </Card>

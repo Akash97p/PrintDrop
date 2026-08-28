@@ -30,12 +30,34 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* The site ships dark-only, in step with the AgentNotify reference: one
-   monochrome world — near-black ground, off-white ink, hairline borders —
-   and no theme toggle. */
-:root,
-.dark {
+/* System-aware theme: light by default, dark follows prefers-color-scheme.
+   The .dark class is kept in sync by an inline script in layout.tsx so
+   Tailwind's class-based dark variant and any JS that checks .dark stay
+   consistent, while CSS variables also respond via the media query for
+   no-JS / first-paint correctness. */
+:root {
   --radius: 0.625rem;
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #fafafa;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #e7000b;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #0a0a0a;
+}
+
+.dark {
   --background: #030303;
   --foreground: #fafafa;
   --card: #060606;
@@ -54,6 +76,29 @@
   --border: #1f1f1f;
   --input: #1f1f1f;
   --ring: #7a7a7a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #030303;
+    --foreground: #fafafa;
+    --card: #060606;
+    --card-foreground: #fafafa;
+    --popover: #060606;
+    --popover-foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #060606;
+    --secondary: #141414;
+    --secondary-foreground: #fafafa;
+    --muted: #121212;
+    --muted-foreground: #989898;
+    --accent: #161616;
+    --accent-foreground: #fafafa;
+    --destructive: #ee343b;
+    --border: #1f1f1f;
+    --input: #1f1f1f;
+    --ring: #7a7a7a;
+  }
 }
 
 @layer base {

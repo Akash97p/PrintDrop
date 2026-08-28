@@ -134,7 +134,7 @@ path is proven good and any remaining fault is on the SD side.
 
 ## Partitions
 
-4 MB flash — `feat/ux` uses dual OTA slots so HTTP/SD update does not brick the stick.
+4 MB flash — dual OTA slots so HTTP/SD update does not brick the stick.
 
 | Partition | Offset | Size | Holds |
 |---|---|---|---|
@@ -155,14 +155,14 @@ path is proven good and any remaining fault is on the SD side.
 | USB write | 248 KB/s | SPI @ 20 MHz |
 | Raw SD | ~910 KB/s | SPI @ 20 MHz |
 
-On `feat/sdio` (SDIO 4-bit) the same host at the same clock is ~3-4×
+On SDIO 4-bit the same host at the same clock is ~3-4×
 faster — projected 3 200 KB/s read / 2 000 KB/s write / 3 500 KB/s raw
-at 20 MHz, so a 20 MB print job drops from ~80 s to ~6 s. The SDMMC host
+at 20 MHz (stable on jumper wiring), so a 20 MB print job drops from ~80 s to ~6 s. The SDMMC host
 at 40 MHz can reach ~6 000 KB/s raw on a short breakout; see
 [hardware.md](hardware.md#sdio-clocks--featsdio-projected).
 
-On `main` the path is bounded by driving the card in SPI mode rather than
-4-bit SDIO — the card, not the network, is the bottleneck. `feat/sdio`
+On SPI the path is bounded by driving the card in SPI mode rather than
+4-bit SDIO — the card, not the network, is the bottleneck. SDIO
 removes that bound.
 
 Verified end to end over USB: a 2 MB write survives a SHA-256 round trip

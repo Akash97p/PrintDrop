@@ -161,6 +161,67 @@ void pollLlmnr(const String&) {}
 
 }  // namespace
 
+bool isValidHostname(const String& name) {
+    if (name.length() < 1 || name.length() > 63) return false;
+    if (name.startsWith("-") || name.endsWith("-")) return false;
+    for (size_t i = 0; i < name.length(); ++i) {
+        char c = name[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || (c >= 'A' && c <= 'Z'))) return false;
+    }
+    return true;
+}
+
+String normalizeHostname(const String& raw) {
+    String s = raw;
+    s.trim();
+    s.toLowerCase();
+    String out;
+    out.reserve(s.length());
+    for (size_t i = 0; i < s.length(); ++i) {
+        char c = s[i];
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') out += c;
+        else if (c == '_' || c == ' ' || c == '.') out += '-';
+    }
+    while (out.indexOf("--") >= 0) out.replace("--", "-");
+    while (out.startsWith("-")) out.remove(0, 1);
+    while (out.endsWith("-")) out.remove(out.length() - 1);
+    if (out.length() > 63) out = out.substring(0, 63);
+    while (out.endsWith("-")) out.remove(out.length() - 1);
+    if (out.isEmpty()) out = DEFAULT_HOSTNAME;
+    return out;
+}
+
+bool isHostnameTaken(const String& name, uint32_t timeoutMs) {
+#if PRINTDROP_ENABLE_MDNS
+    if (name.isEmpty()) return false;
+    if (WiFi.status() != WL_CONNECTED) return false;
+    String n = name;
+    n.toLowerCase();
+    IPAddress ip = MDNS.queryHost(n.c_str(), timeoutMs);
+    if (ip != IPAddress(0,0,0,0)) {
+        IPAddress self = WiFi.localIP();
+        if (ip == self) return false;
+        Serial.printf("[net] hostname '%s.local' already at %s\n", n.c_str(), ip.toString().c_str());
+        return true;
+    }
+#else
+    (void)timeoutMs;
+#endif
+    return false;
+}
+
+String findFreeHostname(const String& base) {
+    String b = normalizeHostname(base);
+    if (!isHostnameTaken(b)) return b;
+    for (int i = 2; i <= 10; ++i) {
+        String cand = b + "-" + String(i);
+        if (!isHostnameTaken(cand)) return cand;
+    }
+    String cand = b + "-" + String((uint32_t)ESP.getEfuseMac() & 0xFFF, HEX);
+    cand.toLowerCase();
+    return cand;
+}
+
 bool begin() {
     active = load();
 
@@ -200,6 +261,15 @@ bool begin() {
     WiFi.setAutoReconnect(true);
     log("[net] joined \"%s\" as %s (%d dBm)",
         active.ssid.c_str(), WiFi.localIP().toString().c_str(), (int)WiFi.RSSI());
+    // If another PrintDrop already claims this name, use a free variant for this session.
+    // mDNS probing is blocking (~1.5s) but happens only once at boot.
+    {
+        String free = findFreeHostname(active.hostname);
+        if (free != active.hostname) {
+            log("[net] hostname '%s' is taken, using '%s' for this session — set a unique hostname to make it permanent", active.hostname.c_str(), free.c_str());
+            active.hostname = free;
+        }
+    }
     startMdns(active.hostname);
     startLlmnr(active.hostname);
     log("[net] also at http://%s/ and http://%s.local/ (mDNS+LLMNR)", active.hostname.c_str(), active.hostname.c_str());

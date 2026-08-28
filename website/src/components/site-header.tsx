@@ -22,6 +22,7 @@ const NAV_LINKS = [
   { href: "/#how", label: "How it works" },
   { href: "/#inside", label: "Inside" },
   { href: "/#performance", label: "Performance" },
+  { href: "/devices", label: "Devices" },
   { href: "/#docs", label: "Docs" },
 ]
 

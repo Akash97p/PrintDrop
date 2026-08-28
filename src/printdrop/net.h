@@ -28,6 +28,16 @@ String hostname();
 IPAddress localIp();
 int32_t rssi();
 
+// Hostname helpers — RFC1123: 1..63 chars, a-z0-9 and hyphen, not starting/ending with hyphen.
+bool isValidHostname(const String& name);
+String normalizeHostname(const String& raw);
+// Blocking mDNS probe (~1.5s). Returns true if another host on the LAN already
+// answers for `name.local`. Only meaningful when Wi-Fi is in STA and connected.
+bool isHostnameTaken(const String& name, uint32_t timeoutMs = 1500);
+// Tries base, base-2 … base-10 and returns the first free name, or base-2 as
+// fallback if all are taken.
+String findFreeHostname(const String& base);
+
 Config config();
 // Persists to NVS. The caller is expected to reboot; the radio has to restart
 // either way and a clean boot avoids half-applied static-IP state.

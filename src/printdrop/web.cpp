@@ -89,7 +89,21 @@ String joinPath(const String& dir, const String& name) {
     return dir + "/" + name;
 }
 
+void sendCorsHeaders() {
+    String origin = server.header("Origin");
+    if (origin.isEmpty() || origin == "null") {
+        server.sendHeader("Access-Control-Allow-Origin", "*");
+    } else {
+        server.sendHeader("Access-Control-Allow-Origin", origin);
+        server.sendHeader("Vary", "Origin");
+    }
+    server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    server.sendHeader("Access-Control-Max-Age", "86400");
+}
+
 void sendJson(int code, const String& body) {
+    sendCorsHeaders();
     server.sendHeader("Cache-Control", "no-store");
     server.send(code, "application/json", body);
 }
@@ -150,6 +164,11 @@ bool serveFromLittleFS(String path) {
 }
 
 void handleNotFound() {
+    if (server.method() == HTTP_OPTIONS) {
+        sendCorsHeaders();
+        server.send(204);
+        return;
+    }
     if (serveFromLittleFS(server.uri())) return;
     // Single-page app: unknown non-API routes fall back to the shell.
     if (!server.uri().startsWith("/api/") && serveFromLittleFS("/index.html")) return;
@@ -322,6 +341,7 @@ void handleDownload() {
     if (f.isDirectory()) { f.close(); return sendError(400, "Is a folder"); }
 
     String name = path.substring(path.lastIndexOf('/') + 1);
+    sendCorsHeaders();
     server.sendHeader("Content-Disposition", "attachment; filename=\"" + name + "\"");
     server.streamFile(f, "application/octet-stream");
     f.close();
@@ -441,7 +461,25 @@ void handleWifiSave() {
     net::Config c = net::config();
     if (server.hasArg("ssid"))     c.ssid      = server.arg("ssid");
     if (server.hasArg("password")) c.password  = server.arg("password");
-    if (server.hasArg("hostname")) c.hostname  = server.arg("hostname");
+    if (server.hasArg("hostname")) {
+        String raw = server.arg("hostname");
+        raw.trim();
+        if (!raw.isEmpty()) {
+            String norm = net::normalizeHostname(raw);
+            if (!net::isValidHostname(norm)) {
+                return sendError(400, "Invalid hostname (a-z, 0-9, hyphen, 1-63 chars, not starting/ending with -)");
+            }
+            String cur = net::hostname();
+            cur.toLowerCase();
+            String lowNorm = norm;
+            lowNorm.toLowerCase();
+            if (lowNorm != cur && net::isHostnameTaken(norm, 1200)) {
+                String free = net::findFreeHostname(norm);
+                return sendError(409, "Hostname '" + norm + "' already taken, try '" + free + "'");
+            }
+            c.hostname = norm;
+        }
+    }
     if (server.hasArg("useStatic"))c.useStatic = server.arg("useStatic") == "true" ||
                                                  server.arg("useStatic") == "1";
     if (server.hasArg("ip"))       c.ip      = server.arg("ip");
@@ -549,8 +587,8 @@ bool begin() {
         // Still serve the API so the device is configurable without a UI.
     }
 
-    const char* hdrKeys[] = {"Authorization"};
-    server.collectHeaders(hdrKeys, 1);
+    const char* hdrKeys[] = {"Authorization", "Origin"};
+    server.collectHeaders(hdrKeys, 2);
 
     server.on("/api/status",    HTTP_GET,  handleStatus);
     server.on("/api/list",      HTTP_GET,  handleList);

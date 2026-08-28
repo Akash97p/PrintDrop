@@ -42,15 +42,15 @@ reboot.
 |---|---|---|
 | Read (USB, uncached) — SPI | 485 KB/s | 4-wire SPI @ 20 MHz |
 | Write (USB) — SPI | 248 KB/s | card is the bottleneck |
-| Read (USB, uncached) — SDIO 4-bit | ~3 200 KB/s * | SDIO @ 40 MHz, projected on feat/sdio — 6-7× SPI |
-| Write (USB) — SDIO 4-bit | ~2 000 KB/s * | same wiring, 6 wires |
-| Raw SD throughput — SDIO | ~3 500 KB/s * | vs ~910 KB/s SPI — 20 MB in ~6 s not ~80 s |
+| Read (USB, uncached) — SDIO 4-bit | ~3 200 KB/s * | SDIO @ 20 MHz, projected — ~6× SPI (~6 000 KB/s raw at 40 MHz on short wiring) |
+| Write (USB) — SDIO 4-bit | ~2 000 KB/s * | same wiring, 6 wires (~3 500 KB/s at 40 MHz) |
+| Raw SD throughput — SDIO | ~3 500 KB/s * | vs ~910 KB/s SPI — 20 MB in ~6 s not ~80 s (~6 000 KB/s at 40 MHz) |
 | SD clock — SPI | 20 MHz (verified clean to 25 MHz) | legacy bus |
-| SD clock — SDIO | 40 MHz (20 MHz on jumper wiring) | SDMMC host, 4-bit |
+| SD clock — SDIO | 20 MHz stable (40 MHz with short wiring) | SDMMC host, 4-bit |
 | Web UI size | 62 KB, served from LittleFS | |
 | Card tested | 32 GB SDHC, FAT32 | |
 
-\* *feat/sdio* branch — SPI figures are bench-measured; SDIO figures are projected from the SDMMC host at 40 MHz / 4-bit. Re-measure after wiring the 6-wire breakout.
+\* SPI figures are bench-measured; SDIO figures are projected from the SDMMC host at 20 MHz / 4-bit (stable on jumper wiring, 40 MHz with short wiring). Re-measure after wiring the 6-wire breakout.
 
 ## How the USB and Wi-Fi sides coexist
 
@@ -78,13 +78,13 @@ The full design is in [`docs/architecture.md`](docs/architecture.md).
 ## Hardware
 
 - ESP32-S3-DevKitC-1 (configured for a **4 MB flash, no PSRAM** board)
-- microSD breakout — **SDIO 4-bit on `feat/sdio`** (recommended), **SPI on `main`** (legacy)
+- microSD breakout — **SDIO 4-bit** (recommended, 6 wires), **SPI** (legacy, 4 wires)
 - A **FAT32** card — exFAT will not mount
 - Printer on the native USB port; the UART bridge carries the console
 
 ### Wiring
 
-**SDIO 4-bit — `feat/sdio` (recommended, 6 wires):**
+**SDIO 4-bit (recommended, 6 wires):**
 
 | Signal | GPIO | Notes |
 |--------|------|-------|
@@ -162,13 +162,13 @@ add a DNS rewrite from e.g. `printdrop.office.lan` to the reserved address.
 
 - **Upload** — drag files anywhere onto the page, or use *Choose files*.
   Progress, transfer rate and ETA are shown per file. 20 MB takes ~80 s over SPI,
-  ~6 s over SDIO 4-bit on `feat/sdio` — the card, not the network, is the bottleneck.
+  ~6 s over SDIO 4-bit at 20 MHz (~4 s at 40 MHz) — the card, not the network, is the bottleneck.
 - **Browse** — grid or list view, sorted by name or size, with folder
   navigation. Print jobs get their own icon colour so they stand out.
 - **Eject / refresh printer view** — forces the printer to re-read the card.
   Uploads do this automatically; the button is for when a printer needs nudging.
 
-## New in `feat/ux`
+## The experience
 
 | Feature | What it does | See |
 |---|---|---|

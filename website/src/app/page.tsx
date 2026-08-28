@@ -254,7 +254,7 @@ export default function Home() {
               <div className="relative bg-black p-5 font-mono text-[13px] leading-6 text-zinc-300">
                 <span className="text-zinc-600">$ </span>printfd status
                 <br />
-                bus&nbsp;&nbsp;&nbsp;sdio 4-bit @ 40 MHz · fat32
+                bus&nbsp;&nbsp;&nbsp;sdio 4-bit @ 20 MHz · fat32 — projected
                 <br />
                 wifi&nbsp;&nbsp;printdrop.local · 192.168.1.42
                 <br />
@@ -296,10 +296,12 @@ export default function Home() {
           ))}
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">feat/sdio</span> — SDIO
-          4-bit at 20 MHz delivers ~3 500 KB/s raw; a 20 MB job lands in ~6 s
-          instead of ~80 s on SPI. The old SPI path (485 KB/s read / 248 KB/s
-          write) remains available as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-e printdrop_spi</code>.
+          <span className="font-medium text-foreground">SDIO 4-bit</span> — at
+          20 MHz (stable on jumper wiring) delivers ~3 500 KB/s raw, ~3 200
+          KB/s USB read and ~2 000 KB/s USB write — a 20 MB job lands in ~6 s
+          instead of ~80 s on SPI (485 KB/s read / 248 KB/s write). SDIO 4-bit
+          at 40 MHz reaches ~6 000 KB/s raw on short wiring. The old SPI path
+          remains available as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-e printdrop_spi</code>.
           The card, not the network, was the limit — SDIO removes it.
         </p>
       </section>
@@ -404,11 +406,12 @@ export default function Home() {
             <p className="mt-5 leading-7 text-muted-foreground">
               A 4 MB, no-PSRAM ESP32-S3 drives an SD card over{" "}
               <span className="font-medium text-foreground">
-                SDIO 4-bit at 40 MHz
+                SDIO 4-bit at 20 MHz (40 MHz with short wiring)
               </span>{" "}
-              and presents it through TinyUSB mass storage — ~6× the
-              SPI bandwidth on the same breakout plus two wires. SPI
-              remains available as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-e printdrop_spi</code>.
+              and presents it through TinyUSB mass storage — ~4× the
+              SPI bandwidth on the same breakout plus two wires, ~6×
+              at 40 MHz. SPI remains available as{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-e printdrop_spi</code>.
               The UI is 62 KB of plain HTML, CSS and JavaScript served
               from a LittleFS partition — no CDN, no external requests,
               no build step.
@@ -488,11 +491,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ----------------------------------------------------------- new in feat/ux */}
+      {/* ----------------------------------------------------------- experience */}
       <section className="border-y bg-card/40">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6">
           <div className="max-w-2xl">
-            <Badge>New in feat/ux</Badge>
+            <Badge>The experience</Badge>
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em]">
               Five small pieces, one coherent UX.
             </h2>

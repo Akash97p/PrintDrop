@@ -61,8 +61,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
     >
+      <head>
+        {/* Sync .dark class with system preference before first paint and on change */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var m=window.matchMedia('(prefers-color-scheme: dark)');function a(v){document.documentElement.classList.toggle('dark',v);}a(m.matches);var h=function(e){a(e.matches);};if(m.addEventListener)m.addEventListener('change',h);else if(m.addListener)m.addListener(h);}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-screen font-sans antialiased">
         <SiteHeader />
         <main>{children}</main>

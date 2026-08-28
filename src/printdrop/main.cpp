@@ -86,9 +86,23 @@ static void handleCommand(String line) {
 
     } else if (cmd == "hostname") {
         if (rest.isEmpty()) { Serial.println("usage: hostname <name>"); return; }
+        String norm = net::normalizeHostname(rest);
+        if (!net::isValidHostname(norm)) {
+            Serial.println("invalid hostname (a-z, 0-9, hyphen, 1-63 chars, not starting/ending with -)");
+            return;
+        }
+        {
+            String cur = net::hostname();
+            cur.toLowerCase(); String low = norm; low.toLowerCase();
+            if (low != cur && net::isHostnameTaken(norm, 1200)) {
+                String free = net::findFreeHostname(norm);
+                Serial.printf("hostname '%s' already taken, try '%s'\n", norm.c_str(), free.c_str());
+                return;
+            }
+        }
         net::Config c = net::config();
-        c.hostname = rest;
-        if (net::saveConfig(c)) { Serial.println("saved, restarting"); delay(300); ESP.restart(); }
+        c.hostname = norm;
+        if (net::saveConfig(c)) { Serial.printf("hostname set to '%s', restarting\n", norm.c_str()); delay(300); ESP.restart(); }
 
     } else if (cmd == "forget") {
         net::Config c;

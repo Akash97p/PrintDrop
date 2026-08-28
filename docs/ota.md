@@ -1,6 +1,6 @@
 # OTA — Over-the-Air Update
 
-PrintDrop on `feat/ux` uses a dual-OTA layout so a failed flash does not brick the stick. The single-app `partitions_printdrop.csv` cannot safely update itself.
+PrintDrop uses a dual-OTA layout so a failed flash does not brick the stick. The single-app `partitions_printdrop.csv` cannot safely update itself.
 
 ## Partitions
 

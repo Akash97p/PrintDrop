@@ -134,3 +134,116 @@
   -webkit-mask-image: linear-gradient(#000 20%, #0000 90%);
   mask-image: linear-gradient(#000 20%, #0000 90%);
 }
+
+/* Documentation typography mirrors the reference site: restrained prose,
+   high-contrast headings, bordered code blocks and scrollable data tables. */
+.docs-prose {
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+.docs-prose > :first-child { margin-top: 0; }
+.docs-prose h1 {
+  margin: 0 0 1.5rem;
+  color: var(--foreground);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+.docs-prose h2 {
+  margin: 3rem 0 1rem;
+  scroll-margin-top: 5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+  color: var(--foreground);
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+.docs-prose h3 {
+  margin: 2rem 0 0.75rem;
+  scroll-margin-top: 5rem;
+  color: var(--foreground);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.docs-prose h4 {
+  margin: 1.5rem 0 0.5rem;
+  color: var(--foreground);
+  font-weight: 600;
+}
+.docs-prose p { margin: 1rem 0; }
+.docs-prose strong { color: var(--foreground); font-weight: 600; }
+.docs-prose a {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 4px;
+  transition: text-decoration-color 150ms;
+}
+.docs-prose a:hover { text-decoration-color: var(--foreground); }
+.docs-prose ul,
+.docs-prose ol { margin: 1rem 0; padding-left: 1.5rem; }
+.docs-prose ul { list-style: disc; }
+.docs-prose ol { list-style: decimal; }
+.docs-prose li { margin: 0.4rem 0; padding-left: 0.25rem; }
+.docs-prose li::marker { color: var(--muted-foreground); }
+.docs-prose blockquote {
+  margin: 1.5rem 0;
+  border-left: 2px solid var(--foreground);
+  background: var(--card);
+  padding: 0.75rem 1rem;
+  color: var(--foreground);
+}
+.docs-prose code {
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--muted);
+  padding: 0.12rem 0.35rem;
+  color: var(--foreground);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.86em;
+}
+.docs-prose pre {
+  margin: 1.5rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: #080808;
+  padding: 1rem;
+  color: #e4e4e7;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+.docs-prose pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.docs-prose > table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.docs-prose thead { background: var(--muted); color: var(--foreground); }
+.docs-prose th,
+.docs-prose td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.7rem 0.8rem;
+  text-align: left;
+  vertical-align: top;
+}
+.docs-prose th { font-weight: 600; }
+.docs-prose img { max-width: 100%; height: auto; }
+.docs-prose a > img { display: inline-block; }
+.docs-prose hr { margin: 2rem 0; border: 0; border-top: 1px solid var(--border); }

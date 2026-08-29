@@ -54,6 +54,8 @@ jobs:
         run: pio run -e printdrop_spi
       - name: Build LittleFS (SDIO)
         run: pio run -e printdrop -t buildfs
+      - name: Build LittleFS (SPI)
+        run: pio run -e printdrop_spi -t buildfs
       - name: Prepare artifacts
         run: |
           set -e
@@ -63,36 +65,39 @@ jobs:
           if [[ "$VER" != v* ]]; then VER="0.2.0-dev-${GITHUB_SHA::7}"; fi
           CLEAN_VER="${VER#v}"
           echo "Version $CLEAN_VER (ref $GITHUB_REF_NAME)"
+          BOOT_APP0=$(find ~/.platformio/packages -name boot_app0.bin | head -n 1)
+          if [ -z "$BOOT_APP0" ]; then BOOT_APP0=$(find ~/.platformio -name boot_app0.bin | head -n 1); fi
+          echo "Using boot_app0: $BOOT_APP0"
           # Copy raw firmware bins
           cp .pio/build/printdrop/firmware.bin dist/printdrop-sdio-${CLEAN_VER}.bin
           cp .pio/build/printdrop_spi/firmware.bin dist/printdrop-spi-${CLEAN_VER}.bin
           cp .pio/build/printdrop/littlefs.bin dist/littlefs-${CLEAN_VER}.bin || echo "no littlefs"
+          cp .pio/build/printdrop_spi/littlefs.bin dist/littlefs-spi-${CLEAN_VER}.bin || true
           cp .pio/build/printdrop/partitions.bin dist/partitions-${CLEAN_VER}.bin || true
           cp .pio/build/printdrop/bootloader.bin dist/bootloader-${CLEAN_VER}.bin || true
-          cp .pio/build/printdrop/boot_app0.bin dist/boot_app0-${CLEAN_VER}.bin || true
+          cp "$BOOT_APP0" dist/boot_app0-${CLEAN_VER}.bin || true
           # Create merged full images for initial flash (esptool merge)
           # ESP32-S3 OTA layout: bootloader 0x0, partitions 0x8000, boot_app0 0xe000, firmware 0x10000, littlefs 0x2B0000
-          # Use pio's esptool if available, else pip esptool
           pip install esptool
           # SDIO merged
           esptool.py --chip esp32s3 merge_bin -o dist/printdrop-sdio-full-${CLEAN_VER}.bin \
             --flash_mode dio --flash_freq 80m --flash_size 4MB \
             0x0 .pio/build/printdrop/bootloader.bin \
             0x8000 .pio/build/printdrop/partitions.bin \
-            0xe000 .pio/build/printdrop/boot_app0.bin \
+            0xe000 "$BOOT_APP0" \
             0x10000 .pio/build/printdrop/firmware.bin \
             0x2B0000 .pio/build/printdrop/littlefs.bin || echo "merge sdio failed"
           # SPI merged: use printdrop_spi partitions (same layout, different firmware)
           cp .pio/build/printdrop/partitions.bin dist/partitions-spi-${CLEAN_VER}.bin || true
           cp .pio/build/printdrop_spi/bootloader.bin dist/bootloader-spi-${CLEAN_VER}.bin || true
-          cp .pio/build/printdrop_spi/boot_app0.bin dist/boot_app0-spi-${CLEAN_VER}.bin || true
+          cp "$BOOT_APP0" dist/boot_app0-spi-${CLEAN_VER}.bin || true
           esptool.py --chip esp32s3 merge_bin -o dist/printdrop-spi-full-${CLEAN_VER}.bin \
             --flash_mode dio --flash_freq 80m --flash_size 4MB \
             0x0 .pio/build/printdrop_spi/bootloader.bin \
             0x8000 .pio/build/printdrop_spi/partitions.bin \
-            0xe000 .pio/build/printdrop_spi/boot_app0.bin \
+            0xe000 "$BOOT_APP0" \
             0x10000 .pio/build/printdrop_spi/firmware.bin \
-            0x2B0000 .pio/build/printdrop/littlefs.bin || echo "merge spi failed"
+            0x2B0000 .pio/build/printdrop_spi/littlefs.bin || echo "merge spi failed"
           ls -lh dist/
           sha256sum dist/* > dist/SHA256SUMS.txt || true
           cat dist/SHA256SUMS.txt

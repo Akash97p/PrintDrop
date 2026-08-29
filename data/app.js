@@ -788,15 +788,33 @@
   let dragDepth=0;
   function showOverlay(){ overlay.classList.remove('hidden'); }
   function hideOverlay(){ overlay.classList.add('hidden'); }
-  window.addEventListener('dragenter', e=>{ e.preventDefault(); dragDepth++; showOverlay(); });
-  window.addEventListener('dragover', e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; });
+  function isExternalFileDrag(e){
+    if(dragSrcName) return false; // internal move
+    if(!e.dataTransfer) return false;
+    try{ return Array.from(e.dataTransfer.types).includes('Files'); }catch{ return false; }
+  }
+  window.addEventListener('dragenter', e=>{
+    if(!isExternalFileDrag(e)) return;
+    e.preventDefault(); dragDepth++; showOverlay();
+  });
+  window.addEventListener('dragover', e=>{
+    if(!isExternalFileDrag(e)) return;
+    e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy';
+  });
   window.addEventListener('dragleave', e=>{
+    if(!isExternalFileDrag(e)) return;
     // only hide when leaving window
     if(e.target===document.documentElement||e.target===document.body) dragDepth=Math.max(0,dragDepth-1);
     else dragDepth=Math.max(0,dragDepth-1);
     if(dragDepth===0) hideOverlay();
   });
   window.addEventListener('drop', e=>{
+    if(!isExternalFileDrag(e)){
+      // internal move is handled by folder drop targets
+      // ensure overlay hidden and don't treat as file upload
+      if(dragSrcName) { dragDepth=0; hideOverlay(); }
+      return;
+    }
     e.preventDefault(); dragDepth=0; hideOverlay();
     const files=e.dataTransfer&&e.dataTransfer.files; if(files&&files.length) handleFiles(files);
   });

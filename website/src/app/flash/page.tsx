@@ -99,10 +99,10 @@ export default function FlashPage() {
     };
   }, []);
 
-  const sdioFullAsset = release?.assets.find((a) => a.name.includes("sdio-full") && a.name.endsWith(".bin"));
-  const spiFullAsset = release?.assets.find((a) => a.name.includes("spi-full") && a.name.endsWith(".bin"));
-  const sdioOtaAsset = release?.assets.find((a) => a.name.includes("sdio") && !a.name.includes("full") && a.name.endsWith(".bin"));
-  const spiOtaAsset = release?.assets.find((a) => a.name.includes("spi") && !a.name.includes("full") && a.name.endsWith(".bin"));
+  const sdioFullAsset = release?.assets.find((a) => a.name.startsWith("printdrop-sdio-full-") && a.name.endsWith(".bin"));
+  const spiFullAsset = release?.assets.find((a) => a.name.startsWith("printdrop-spi-full-") && a.name.endsWith(".bin"));
+  const sdioOtaAsset = release?.assets.find((a) => /^printdrop-sdio-.*\.bin$/.test(a.name) && !a.name.includes("full"));
+  const spiOtaAsset = release?.assets.find((a) => /^printdrop-spi-.*\.bin$/.test(a.name) && !a.name.includes("full"));
   const currentFullUrl = variant === "sdio" ? sdioFullAsset?.browser_download_url : spiFullAsset?.browser_download_url;
   const currentOtaUrl = variant === "sdio" ? sdioOtaAsset?.browser_download_url : spiOtaAsset?.browser_download_url;
 
@@ -375,13 +375,30 @@ export default function FlashPage() {
                   className="rounded-md border bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
                 />
               </label>
-              <Button variant="outline" onClick={() => handleDownloadFromRelease(false)} disabled={!currentFullUrl}>
-                Fetch merged from GitHub
-              </Button>
-              <Button variant="outline" onClick={() => handleDownloadFromRelease(true)} disabled={!currentOtaUrl}>
-                Fetch OTA from GitHub
-              </Button>
+              {currentFullUrl ? (
+                <Button variant="outline" asChild>
+                  <a href={currentFullUrl} target="_blank" rel="noopener">
+                    <Download className="size-3" /> Download merged
+                  </a>
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>
+                  Download merged (pending)
+                </Button>
+              )}
+              {currentOtaUrl ? (
+                <Button variant="outline" asChild>
+                  <a href={currentOtaUrl} target="_blank" rel="noopener">
+                    <Download className="size-3" /> Download OTA
+                  </a>
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>
+                  Download OTA (pending)
+                </Button>
+              )}
             </div>
+            <p className="text-xs text-muted-foreground">Download from GitHub Releases, then pick the file above — direct browser fetch from GitHub is blocked by CORS, so download + select is the reliable path.</p>
             {file && <div className="text-xs text-muted-foreground">Ready: {file.name} — {fmtBytes(file.size)} — will flash at 0x0 (merged)</div>}
 
             <div className="flex flex-wrap gap-2">

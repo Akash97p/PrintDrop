@@ -4,10 +4,10 @@ import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Activity,
-  AlertTriangle,
   ExternalLink,
   HardDrive,
   Radio,
+  RefreshCw,
   Search,
   Wifi,
   Cpu,
@@ -102,13 +102,55 @@ export default function DevicesPage() {
   const [scanning, setScanning] = useState(false);
   const [found, setFound] = useState<FoundDevice[]>([]);
   const [log, setLog] = useState<string[]>([]);
-  const [isHttps, setIsHttps] = useState(false);
 
-  useEffect(() => {
-    setIsHttps(typeof window !== "undefined" && window.location.protocol === "https:");
+  const addLog = useCallback((s: string) => setLog((p) => [...p.slice(-20), s]), []);
+
+  // Try to learn the local /24(s) via WebRTC. Falls back to common home subnets.
+  const getLocalSubnets = useCallback(async (): Promise<string[]> => {
+    const ips = new Set<string>();
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel("");
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          try {
+            pc.close();
+          } catch {}
+          resolve();
+        };
+        pc.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
+          if (!e.candidate || !e.candidate.candidate) return;
+          const m = e.candidate.candidate.match(/(\d+\.\d+\.\d+)\.\d+/);
+          if (m) ips.add(m[1]);
+        };
+        setTimeout(finish, 900);
+        // also watch for null candidate
+        const check = setInterval(() => {
+          if (pc.iceGatheringState === "complete") {
+            clearInterval(check);
+            finish();
+          }
+        }, 200);
+        setTimeout(() => {
+          clearInterval(check);
+          finish();
+        }, 1000);
+      });
+    } catch {
+      // ignore
+    }
+    const subnets = [...ips]
+      .map((ip) => ip.split(".").slice(0, 3).join("."))
+      .filter((s) => /^\d+\.\d+\.\d+$/.test(s));
+    if (subnets.length) return [...new Set(subnets)];
+    // fallback: most home routers use these
+    return ["192.168.1", "192.168.0"];
   }, []);
-
-  const addLog = useCallback((s: string) => setLog((p) => [...p.slice(-12), s]), []);
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -116,60 +158,73 @@ export default function DevicesPage() {
     setLog([]);
     const b = base.trim().toLowerCase() || "printdrop";
     const candidates: string[] = [];
-    // mDNS + LLMNR for base and base-2..base-6
+    // mDNS + LLMNR for base and base-2..base-6 (fast, will be tried first)
     const bases = [b];
     for (let i = 2; i <= 6; i++) bases.push(`${b}-${i}`);
     for (const h of bases) {
       candidates.push(`http://${h}.local/api/status`);
       candidates.push(`http://${h}/api/status`);
     }
-    // also try without suffix for plain .local LLMNR already
-    // custom IP if provided
     if (customIp.trim()) {
       let ip = customIp.trim();
       if (!ip.startsWith("http")) ip = `http://${ip}`;
       if (!ip.endsWith("/api/status")) ip = ip.replace(/\/$/, "") + "/api/status";
       candidates.unshift(ip);
     }
-    // de-duplicate
-    const uniq = [...new Set(candidates)];
-    addLog(`Probing ${uniq.length} candidates…`);
-    if (isHttps) {
-      addLog("ℹ https→http private network — Chrome will ask “Allow local network access?” on first scan. Click Allow. Firefox/Safari: use file:// scanner.");
+
+    // Subnet scan: enumerate every host in local /24(s)
+    try {
+      const subnets = await getLocalSubnets();
+      addLog(`Local subnets: ${subnets.join(", ")} — scanning each /24…`);
+      for (const subnet of subnets.slice(0, 2)) {
+        for (let i = 1; i <= 254; i++) {
+          candidates.push(`http://${subnet}.${i}/api/status`);
+        }
+      }
+    } catch {
+      // ignore
     }
 
+    const uniq = [...new Set(candidates)];
+    addLog(`Scanning ${uniq.length} candidates (hostnames + subnet)…`);
+
     const results: FoundDevice[] = [];
-    // probe in parallel with concurrency limit 4
+    // high-concurrency subnet probe: 50 parallel, 550 ms timeout per host
     const queue = [...uniq];
-    const workers = Array.from({ length: 4 }, async () => {
+    // prioritize hostname probes first (they are at front), then subnet IPs; workers will take in order
+    const concurrency = 50;
+    const perHostTimeout = 550;
+    const workers = Array.from({ length: concurrency }, async () => {
       while (queue.length) {
         const url = queue.shift()!;
+        // only log hostnames verbosely; subnet IPs would flood log
+        const isHostnameProbe = url.includes(".local") || url.includes(`://${b}`);
+        if (isHostnameProbe) addLog(`try ${url}`);
         try {
-          addLog(`try ${url}`);
-          const st = await fetchWithTimeout(url, 1600);
+          const st = await fetchWithTimeout(url, perHostTimeout);
           const devUrl = url.replace("/api/status", "");
-          // dedupe by ip
           if (!results.some((r) => r.status.ip === st.ip)) {
             results.push({ url: devUrl, status: st });
-            addLog(`✓ ${st.hostname}.local → ${st.ip} (${st.card.busMode} ${st.card.busWidth}-bit)`);
+            addLog(`✓ ${st.hostname} → ${st.ip} (${st.card.busMode} ${st.card.busWidth}-bit)`);
           }
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          // AbortError is timeout / mixed content — keep quiet unless debug
-          if (msg.includes("Failed to fetch") && isHttps) {
-            // likely mixed content, will be reported once
-          }
+        } catch {
+          // quiet for subnet sweep
         }
       }
     });
     await Promise.all(workers);
-    // sort by hostname
     results.sort((a, b) => a.status.hostname.localeCompare(b.status.hostname));
     setFound(results);
-    if (results.length === 0) addLog("No devices answered. Try adding IP manually or check that device and PC are on same Wi-Fi.");
+    if (results.length === 0) addLog("No devices answered. Make sure the PrintDrop and this browser are on the same Wi-Fi, then hit Discover again.");
     else addLog(`Done — ${results.length} device(s) found.`);
     setScanning(false);
-  }, [base, customIp, addLog, isHttps]);
+  }, [base, customIp, addLog, getLocalSubnets]);
+
+  // auto-scan on mount with a small animation
+  useEffect(() => {
+    const t = setTimeout(() => scan(), 400);
+    return () => clearTimeout(t);
+  }, [scan]);
 
   const downloadStandalone = useCallback(() => {
     const html = `<!doctype html><meta charset=utf-8><title>PrintDrop Scanner (standalone)</title>
@@ -213,39 +268,22 @@ async function addIp(){await scan();}
         <Badge variant="secondary">Local discovery</Badge>
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Devices on your network</h1>
         <p className="mt-4 leading-7 text-muted-foreground">
-          Probes mDNS <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">printdrop.local</code> and LLMNR{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">printdrop</code> (plus{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-2</code>…<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">-6</code>) via{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">/api/status</code>. Works when the scanner and the stick are on the same
-          LAN. If you renamed a stick, change the prefix below.
+          Auto-discovers PrintDrops on your LAN — probes mDNS <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">printdrop.local</code> /
+          LLMNR <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">printdrop</code> plus a fast <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">/24</code> subnet sweep (
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">x.x.x.1–254</code> at 550 ms, 50 parallel). Works for{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">http://printdrop.local</code>,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">http://printdrop</code> and plain <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">192.168.x.x</code> — no manual IP needed.
         </p>
-
-        {isHttps && (
-          <Card className="mt-6 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-100">
-                <AlertTriangle className="size-4" />
-                This page is https, the device is http
-              </CardTitle>
-              <CardDescription className="text-amber-800 dark:text-amber-200">
-                <strong>Chrome/Edge:</strong> first <em>Scan</em> will trigger a one-click prompt “Allow this site to access your local network?”
-                — click <strong>Allow</strong> and the scan will work (via Private Network Access). The stick now sends{" "}
-                <code>Access-Control-Allow-Private-Network: true</code>. <br />
-                <strong>Firefox/Safari</strong> don’t support that yet — download the standalone scanner below and open it via{" "}
-                <code>file://</code> (double-click). Direct <code>http://printdrop.local</code> links below always work.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
 
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Search className="size-4" /> Scan
+              {scanning ? <RefreshCw className="size-4 animate-spin" /> : <Search className="size-4" />} {scanning ? "Scanning your network…" : "Discover"}
             </CardTitle>
             <CardDescription>
-              Hostnames are sanitized to <code>a-z 0-9 -</code> (1–63 chars). If <code>printdrop</code> is taken, the device now auto-uses{" "}
-              <code>printdrop-2</code> and the API will suggest the free name on save.
+              {scanning
+                ? "Probing hostnames and every host in your local /24 — this takes ~3 s. Devices that respond to /api/status will appear below."
+                : "Scans mDNS/LLMNR hostnames (printdrop … printdrop-6) and every IP in your local subnet. Hostnames are sanitized to a-z 0-9 - (1–63 chars)."}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -264,12 +302,18 @@ async function addIp(){await scan();}
                 <input
                   value={customIp}
                   onChange={(e) => setCustomIp(e.target.value)}
-                  placeholder="10.74.179.223"
+                  placeholder="192.168.1.25"
                   className="rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </label>
               <Button onClick={scan} disabled={scanning}>
-                {scanning ? "Scanning…" : "Scan now"}
+                {scanning ? (
+                  <>
+                    <RefreshCw className="size-4 animate-spin" /> Scanning…
+                  </>
+                ) : (
+                  "Discover"
+                )}
               </Button>
               <Button variant="outline" onClick={downloadStandalone}>
                 Download standalone scanner
@@ -286,6 +330,7 @@ async function addIp(){await scan();}
               <a href={`http://${(base.trim() || "printdrop")}.local`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-accent">
                 Open {base.trim() || "printdrop"}.local <ExternalLink className="size-3" />
               </a>
+              {scanning && <span className="inline-flex items-center gap-1 rounded-md border bg-primary/10 px-2 py-1 text-primary">50 parallel · 550 ms timeout</span>}
             </div>
           </CardContent>
         </Card>

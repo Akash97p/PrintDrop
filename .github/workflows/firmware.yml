@@ -76,6 +76,11 @@ jobs:
           cp .pio/build/printdrop/partitions.bin dist/partitions-${CLEAN_VER}.bin || true
           cp .pio/build/printdrop/bootloader.bin dist/bootloader-${CLEAN_VER}.bin || true
           cp "$BOOT_APP0" dist/boot_app0-${CLEAN_VER}.bin || true
+          # Firmware JSON for SD-card OTA (variant-specific version)
+          echo "{\"version\":\"${CLEAN_VER}\"}" > dist/firmware-sdio-${CLEAN_VER}.json
+          echo "{\"version\":\"${CLEAN_VER}-spi\"}" > dist/firmware-spi-${CLEAN_VER}.json
+          # Generic firmware.json for convenience (defaults to SDIO variant)
+          cp dist/firmware-sdio-${CLEAN_VER}.json dist/firmware-${CLEAN_VER}.json
           # Create merged full images for initial flash (esptool merge)
           # ESP32-S3 OTA layout: bootloader 0x0, partitions 0x8000, boot_app0 0xe000, firmware 0x10000, littlefs 0x2B0000
           pip install esptool

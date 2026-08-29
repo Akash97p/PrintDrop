@@ -105,6 +105,21 @@ export default function FlashPage() {
   const spiOtaAsset = release?.assets.find((a) => /^printdrop-spi-.*\.bin$/.test(a.name) && !a.name.includes("full"));
   const currentFullUrl = variant === "sdio" ? sdioFullAsset?.browser_download_url : spiFullAsset?.browser_download_url;
   const currentOtaUrl = variant === "sdio" ? sdioOtaAsset?.browser_download_url : spiOtaAsset?.browser_download_url;
+  const variantFullAsset = variant === "sdio" ? sdioFullAsset : spiFullAsset;
+  const variantOtaAsset = variant === "sdio" ? sdioOtaAsset : spiOtaAsset;
+  const cleanVer = release?.tag_name?.replace(/^v/, "") || "0.2.1";
+  const jsonVersion = variant === "spi" ? `${cleanVer}-spi` : cleanVer;
+
+  const handleDownloadJson = useCallback(() => {
+    const json = JSON.stringify({ version: jsonVersion }, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "firmware.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }, [jsonVersion]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
@@ -254,8 +269,11 @@ export default function FlashPage() {
           <div className="flex flex-wrap gap-2">
             <Button asChild>
               <a href={currentOtaUrl || `${GITHUB_RELEASES}/latest`} target="_blank" rel="noopener">
-                <Download className="size-4" /> Download OTA bin {release?.tag_name ? `(${release.tag_name})` : ""}
+                <Download className="size-4" /> Download OTA bin {variant === "spi" ? "SPI" : "SDIO"} {release?.tag_name ? `(${release.tag_name})` : ""}
               </a>
+            </Button>
+            <Button variant="outline" onClick={handleDownloadJson}>
+              <Download className="size-3" /> Download firmware.json <span className="font-mono text-xs">({`{"version":"${jsonVersion}"}`})</span>
             </Button>
             <Button variant="outline" asChild>
               <a href={`${GITHUB_RELEASES}`} target="_blank" rel="noopener">
@@ -263,6 +281,7 @@ export default function FlashPage() {
               </a>
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">OTA via web UI needs only the <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">.bin</code>. For SD-card update copy both <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">firmware.bin</code> (rename the OTA bin) + <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">firmware.json</code> to SD root — the json is generated for the selected variant ({variant === "spi" ? "SPI" : "SDIO"}).</p>
           <p className="text-xs text-muted-foreground">
             LED: idle 2 s blink, activity fast, error double-blink. Button short = eject/refresh printer view; long 5 s =
             factory reset.
@@ -317,38 +336,32 @@ export default function FlashPage() {
           </div>
 
           <div className="grid gap-2 rounded-lg border bg-muted/30 p-4">
-            <div className="text-sm font-medium">Latest release</div>
+            <div className="text-sm font-medium">Latest release — {variant === "spi" ? "SPI legacy" : "SDIO 4-bit"} {release?.tag_name ? `· ${release.tag_name}` : ""}</div>
             {release ? (
               <div className="grid gap-2 text-sm">
                 <div className="font-mono text-xs">
                   <a href={release.html_url} target="_blank" rel="noopener" className="underline-offset-4 hover:underline">
                     {release.tag_name} — {release.name}
                   </a>{" "}
-                  · {new Date(release.published_at).toLocaleString()} · {release.assets.length} assets
+                  · {new Date(release.published_at).toLocaleString()} · {release.assets.length} assets total
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {sdioFullAsset && (
-                    <a href={sdioFullAsset.browser_download_url} className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-accent">
-                      <Download className="size-3" /> SDIO full {fmtBytes(sdioFullAsset.size)}
+                  {variantOtaAsset ? (
+                    <a href={variantOtaAsset.browser_download_url} className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-accent">
+                      <Download className="size-3" /> {variant === "spi" ? "SPI" : "SDIO"} OTA {fmtBytes(variantOtaAsset.size)}
                     </a>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md border bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">{variant === "spi" ? "SPI" : "SDIO"} OTA — pending for this release</span>
                   )}
-                  {spiFullAsset && (
-                    <a href={spiFullAsset.browser_download_url} className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-accent">
-                      <Download className="size-3" /> SPI full {fmtBytes(spiFullAsset.size)}
+                  {variantFullAsset ? (
+                    <a href={variantFullAsset.browser_download_url} className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-accent">
+                      <Download className="size-3" /> {variant === "spi" ? "SPI" : "SDIO"} full {fmtBytes(variantFullAsset.size)}
                     </a>
-                  )}
-                  {sdioOtaAsset && (
-                    <a href={sdioOtaAsset.browser_download_url} className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-accent">
-                      <Download className="size-3" /> SDIO OTA {fmtBytes(sdioOtaAsset.size)}
-                    </a>
-                  )}
-                  {spiOtaAsset && (
-                    <a href={spiOtaAsset.browser_download_url} className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs hover:bg-accent">
-                      <Download className="size-3" /> SPI OTA {fmtBytes(spiOtaAsset.size)}
-                    </a>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md border bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">{variant === "spi" ? "SPI" : "SDIO"} full — pending for this release (use OTA or wait for v0.2.1+)</span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">Full = bootloader + partitions + app + littlefs merged at 0x0 (flash once). OTA = app only for Settings → Firmware (OTA).</div>
+                <div className="text-xs text-muted-foreground">Filtered to selected variant. Full = bootloader + partitions + app + littlefs merged at 0x0 (flash once). OTA = app only for Settings → Firmware (OTA). Switch variant above to see the other pair · <a href={`${GITHUB_RELEASES}/tag/${release.tag_name}`} target="_blank" rel="noopener" className="underline">View all 8 assets on GitHub</a>.</div>
               </div>
             ) : releaseError ? (
               <div className="text-sm text-muted-foreground">

@@ -400,7 +400,10 @@ void refreshHostView() {
     setMedia(false);
     xSemaphoreGive(sdMutex);
     // Give the host time to notice the removal before offering it back.
-    delay(600);
+    // 1500 ms is chosen to survive hosts that poll only every 500-1000 ms
+    // (Windows, many printers). The previous 600 ms was missed when the
+    // upload was tiny (50-byte file) and the whole offline window was short.
+    delay(1500);
     if (xSemaphoreTake(sdMutex, pdMS_TO_TICKS(5000)) == pdTRUE) {
         setMedia(true);
         xSemaphoreGive(sdMutex);

@@ -133,6 +133,12 @@
   <!-- SETTINGS -->
   <section id="view-settings" class="view" aria-labelledby="settings-heading">
     <div class="view__head"><h1 id="settings-heading" class="view__title">Settings</h1></div>
+    <div class="tabs" role="tablist" aria-label="Settings sections">
+      <button class="tabs__btn is-active" role="tab" aria-selected="true" data-tab="wifi" type="button">Wi-Fi</button>
+      <button class="tabs__btn" role="tab" aria-selected="false" data-tab="auth" type="button">Web UI Login</button>
+      <button class="tabs__btn" role="tab" aria-selected="false" data-tab="ota" type="button">Firmware (OTA)</button>
+    </div>
+    <div id="settings-tab-wifi" class="settings-tab is-active" role="tabpanel">
     <div class="card">
       <h2 class="card__title">Wi-Fi</h2>
       <p class="muted muted--sm" style="margin-bottom:10px">Saving reboots the device. It will rejoin on the new network — you may need to reconnect to it. Also reachable at <code id="discInfo">printdrop.local / printdrop</code> via mDNS+LLMNR.</p>
@@ -155,6 +161,8 @@
         <button class="btn btn--primary" type="submit">Save &amp; reboot</button>
       </form>
     </div>
+    </div>
+    <div id="settings-tab-auth" class="settings-tab" role="tabpanel">
     <div class="card" id="authCard">
       <h2 class="card__title">Web UI Login</h2>
       <p class="muted muted--sm" style="margin-bottom:10px">Protects the whole UI + API with HTTP Basic. Stored as SHA-256 in NVS. Initial user/hash from <code>platformio.ini</code> <code>PRINTDROP_AUTH_*</code> or via serial <code>auth &lt;user&gt; &lt;pass&gt;</code>. Leave blank to keep current.</p>
@@ -169,6 +177,8 @@
       </form>
       <p class="muted muted--sm">Button long-press 5 s: factory reset (clears Wi-Fi + login). Serial: <code>clear-auth</code> / <code>factory-reset</code>.</p>
     </div>
+    </div>
+    <div id="settings-tab-ota" class="settings-tab" role="tabpanel">
     <div class="card" id="otaCard">
       <h2 class="card__title">Firmware (OTA)</h2>
       <p class="muted muted--sm">Current: <code id="otaCurrent">—</code> <span id="otaEnabledBadge"></span></p>
@@ -182,6 +192,7 @@
       <div id="otaProgress" class="progress hidden" style="margin-top:8px"><div id="otaBar" class="progress__fill"></div></div>
       <p class="muted muted--sm">Or copy <code>firmware.bin</code> + <code>firmware.json</code> <code>{"version":"0.2.0"}</code> to SD root, then refresh. Uses dual OTA slots (<code>partitions_printdrop_ota.csv</code>).</p>
       <p class="muted muted--sm">LED: idle 2 s blink, activity fast, error double-blink. Button short = eject, long = factory reset.</p>
+    </div>
     </div>
   </section>
 
@@ -202,6 +213,7 @@
   <div class="drop-overlay__box"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><p>Drop to upload</p><span class="muted muted--sm" id="dropPathLabel">to /</span></div>
 </div>
 
+<div id="ctxMenu" class="ctx hidden" role="menu" aria-hidden="true"></div>
 <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-relevant="additions"></div>
 
 <!-- Modal -->

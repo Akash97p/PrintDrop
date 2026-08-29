@@ -134,13 +134,16 @@
     if(entry.dir) return 'folder';
     const e=extOf(entry.name);
     if(['gcode','gco','g','bgcode'].includes(e)) return 'gcode';
-    if(['stl','3mf','obj','step','stp'].includes(e)) return 'model';
-    if(['zip','rar','7z'].includes(e)) return 'archive';
-    if(['txt','log','ini','cfg','json'].includes(e)) return 'doc';
+    if(['stl','3mf','obj','step','stp','amf','blend','fbx'].includes(e)) return 'model';
+    if(['zip','rar','7z','tar','gz','tgz'].includes(e)) return 'archive';
+    if(['png','jpg','jpeg','gif','webp','bmp','svg','tiff','ico','heic'].includes(e)) return 'image';
+    if(['csv','xls','xlsx','ods','tsv'].includes(e)) return 'spreadsheet';
+    if(['pdf'].includes(e)) return 'pdf';
+    if(['txt','log','ini','cfg','json','md','yml','yaml','xml'].includes(e)) return 'doc';
     return 'file';
   }
   function typeLabel(k){
-    return {gcode:'G-code',model:'3D model',folder:'Folder',archive:'Archive',doc:'Document',file:'File'}[k]||'File';
+    return {gcode:'G-code',model:'3D model',folder:'Folder',archive:'Archive',image:'Image',spreadsheet:'Spreadsheet',pdf:'PDF',doc:'Document',file:'File'}[k]||'File';
   }
   // inline SVG per kind (small, no external)
   function iconSVG(kind){
@@ -149,6 +152,9 @@
     if(kind==='gcode') return `<svg ${base}><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/><path d="M12 11v4"/><path d="M9 14h6"/><circle cx="12" cy="8.5" r="1" fill="currentColor" stroke="none"/></svg>`;
     if(kind==='model') return `<svg ${base}><path d="M12 2L3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>`;
     if(kind==='archive') return `<svg ${base}><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M12 14v4"/><path d="M9 15l3 3 3-3"/></svg>`;
+    if(kind==='image') return `<svg ${base}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M3 16l5-5 4 4 3-3 6 6"/><path d="M14 14h.01"/></svg>`;
+    if(kind==='spreadsheet') return `<svg ${base}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>`;
+    if(kind==='pdf') return `<svg ${base}><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13c0-1 1-2 2-2s2 1 2 2-1 2-2 2h-1v2"/><path d="M8 13v4"/><path d="M14 13v4h2"/></svg>`;
     if(kind==='doc') return `<svg ${base}><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`;
     return `<svg ${base}><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
   }
@@ -197,6 +203,18 @@
     const sb=$('#sidebar'); const open=sb.classList.toggle('is-open');
     $('#mobileNavToggle').setAttribute('aria-expanded', String(open));
   });
+
+  // --- Settings tabs ---
+  function showSettingsTab(name){
+    $$('.tabs__btn').forEach(b=>{ const on=b.dataset.tab===name; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on)); });
+    $$('.settings-tab').forEach(p=> p.classList.toggle('is-active', p.id==='settings-tab-'+name));
+    localStorage.setItem('printdrop.settingsTab', name);
+  }
+  $$('.tabs__btn').forEach(b=> b.addEventListener('click',()=> showSettingsTab(b.dataset.tab)));
+  const _savedTab = localStorage.getItem('printdrop.settingsTab') || 'wifi';
+  // defer until DOM ready; will be applied on init as well
+  if(document.readyState!=='loading') showSettingsTab(_savedTab);
+  else document.addEventListener('DOMContentLoaded',()=> showSettingsTab(_savedTab));
 
   // --- View mode toggle ---
   function applyViewMode(m){
@@ -362,6 +380,37 @@
     return a;
   }
 
+  // --- Drag state ---
+  let dragSrcName = null;
+  let dragSrcIsDir = false;
+  function handleDragStart(e, ent){
+    dragSrcName = ent.name; dragSrcIsDir = ent.dir;
+    e.dataTransfer.effectAllowed='move';
+    try{ e.dataTransfer.setData('text/plain', ent.name); }catch{}
+    // add dragging class after tick
+    setTimeout(()=>{
+      const el=e.currentTarget; if(el) el.classList.add('file-card--dragging');
+    },0);
+  }
+  function handleDragEnd(e){
+    e.currentTarget.classList.remove('file-card--dragging');
+    dragSrcName=null;
+    $$('.file-card--drop-target').forEach(el=>el.classList.remove('file-card--drop-target'));
+    $$('tr.drop-target').forEach(el=>el.classList.remove('drop-target'));
+  }
+  async function handleDropOnFolder(targetFolderEnt, e){
+    e.preventDefault(); e.stopPropagation();
+    const src = dragSrcName;
+    if(!src || src===targetFolderEnt.name) return;
+    const from = joinPath(curPath, src);
+    const to = joinPath(joinPath(curPath, targetFolderEnt.name), src);
+    // avoid moving folder into itself
+    if(dragSrcIsDir && to.startsWith(from+'/')){ toast('Cannot move a folder into itself','error'); return; }
+    const r=await apiPostForm('/api/rename',{from,to});
+    if(r.ok){ toast('Moved '+src+' → '+targetFolderEnt.name); loadPath(curPath); refreshStatus(); }
+    else toast(r.error||'Move failed','error');
+  }
+
   function renderFiles(){
     const sorted=sortedEntries();
     const emptyEl=$('#filesEmpty'), grid=$('#fileGrid'), wrap=$('#fileListWrap');
@@ -377,6 +426,8 @@
         const card=document.createElement('div');
         card.className='file-card file-card--'+kind + (ent.dir?' file-card--folder':'');
         card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label',(ent.dir?'Folder ':'')+ent.name);
+        card.dataset.name=ent.name; card.dataset.isDir=ent.dir?'1':'0';
+        card.draggable=true;
         card.innerHTML=`<div class="file-card__icon">${iconSVG(kind)}</div>
           <div class="file-card__name" title="${esc(ent.name)}">${esc(ent.name)}</div>
           <div class="file-card__meta"><span>${ent.dir?'Folder':fmtBytes(ent.size)}</span><span>${typeLabel(kind)}</span></div>
@@ -398,14 +449,26 @@
         actions.appendChild(rn); actions.appendChild(del);
         card.addEventListener('click',()=>{ if(ent.dir) loadPath(joinPath(curPath, ent.name)); });
         card.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); if(ent.dir) loadPath(joinPath(curPath, ent.name)); }});
+        // drag
+        card.addEventListener('dragstart', e=> handleDragStart(e, ent));
+        card.addEventListener('dragend', handleDragEnd);
+        if(ent.dir){
+          card.addEventListener('dragenter', e=>{ if(dragSrcName && dragSrcName!==ent.name){ e.preventDefault(); card.classList.add('file-card--drop-target'); }});
+          card.addEventListener('dragover', e=>{ if(dragSrcName && dragSrcName!==ent.name){ e.preventDefault(); e.dataTransfer.dropEffect='move'; }});
+          card.addEventListener('dragleave', e=>{ card.classList.remove('file-card--drop-target'); });
+          card.addEventListener('drop', e=> handleDropOnFolder(ent, e));
+        }
         grid.appendChild(card);
       });
+      // allow dropping on empty grid area = move to curPath? no-op; grid itself accepts files for upload already
     } else {
       grid.classList.add('hidden'); wrap.classList.remove('hidden');
       const tbody=$('#fileListBody'); tbody.innerHTML='';
       sorted.forEach(ent=>{
         const kind=kindFor(ent);
         const tr=document.createElement('tr');
+        tr.dataset.name=ent.name; tr.dataset.isDir=ent.dir?'1':'0';
+        tr.draggable=true;
         const nameTd=document.createElement('td');
         nameTd.innerHTML=`<span style="display:inline-flex;align-items:center;gap:8px"><span style="width:22px;height:22px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:6px">${iconSVG(kind).replace('width="28"','width="16"').replace('height="28"','height="16"')}</span> ${esc(ent.name)}</span>`;
         if(ent.dir){ nameTd.style.cursor='pointer'; nameTd.addEventListener('click',()=>loadPath(joinPath(curPath, ent.name))); nameTd.title='Open folder'; }
@@ -422,7 +485,17 @@
         const rn=document.createElement('button'); rn.className='btn btn--ghost'; rn.type='button'; rn.textContent='Rename'; rn.addEventListener('click',()=>doRename(ent)); actTd.appendChild(rn);
         const del=document.createElement('button'); del.className='btn btn--ghost'; del.type='button'; del.textContent='Delete'; del.setAttribute('aria-label','Delete '+ent.name);
         del.addEventListener('click',()=>doDelete(ent)); actTd.appendChild(del);
-        tr.append(nameTd,sizeTd,typeTd,actTd); tbody.appendChild(tr);
+        tr.append(nameTd,sizeTd,typeTd,actTd);
+        // drag for rows
+        tr.addEventListener('dragstart', e=> handleDragStart(e, ent));
+        tr.addEventListener('dragend', handleDragEnd);
+        if(ent.dir){
+          tr.addEventListener('dragenter', e=>{ if(dragSrcName && dragSrcName!==ent.name){ e.preventDefault(); tr.classList.add('drop-target'); }});
+          tr.addEventListener('dragover', e=>{ if(dragSrcName && dragSrcName!==ent.name){ e.preventDefault(); e.dataTransfer.dropEffect='move'; }});
+          tr.addEventListener('dragleave', ()=> tr.classList.remove('drop-target'));
+          tr.addEventListener('drop', e=> handleDropOnFolder(ent, e));
+        }
+        tbody.appendChild(tr);
       });
     }
   }
@@ -511,6 +584,110 @@
     const r=await apiPostForm('/api/mkdir',{path:joinPath(curPath, n)});
     if(r.ok){ toast('Folder created'); loadPath(curPath); } else toast(r.error||'Create failed','error');
   });
+  async function doMove(ent){
+    const from=joinPath(curPath, ent.name);
+    const dest=await openModal({title:'Move '+ent.name,msg:'Enter destination folder (e.g. /archive or /). Current: '+curPath,showInput:true,inputValue:parentPath(curPath),placeholder:'/folder',okText:'Move'});
+    if(dest===false) return;
+    let d=String(dest).trim(); if(!d) d='/';
+    d=normPath(d);
+    // verify dest exists and is dir (best effort)
+    const to=joinPath(d, ent.name);
+    if(to===from){ toast('Already there','warn'); return; }
+    if(useMock && !MOCK_FS[d]){ toast('Destination folder does not exist','error'); return; }
+    const r=await apiPostForm('/api/rename',{from,to});
+    if(r.ok){ toast('Moved to '+d); loadPath(curPath); } else toast(r.error||'Move failed','error');
+  }
+
+  // --- Context menu ---
+  const ctxEl = $('#ctxMenu');
+  function hideCtx(){ if(ctxEl){ ctxEl.classList.add('hidden'); ctxEl.setAttribute('aria-hidden','true'); ctxEl.innerHTML=''; } }
+  function showCtx(x,y, items){
+    if(!ctxEl) return;
+    ctxEl.innerHTML='';
+    items.forEach(it=>{
+      if(it.sep){ const s=document.createElement('div'); s.className='ctx__sep'; ctxEl.appendChild(s); return; }
+      if(it.label && it.isLabel){ const l=document.createElement('div'); l.className='ctx__label'; l.textContent=it.label; ctxEl.appendChild(l); return; }
+      const b=document.createElement('button'); b.type='button'; b.className='ctx__item'+(it.danger?' ctx__item--danger':''); b.setAttribute('role','menuitem');
+      b.textContent=it.label;
+      b.addEventListener('click',()=>{ hideCtx(); if(it.action) it.action(); });
+      ctxEl.appendChild(b);
+    });
+    ctxEl.style.left=Math.min(x, window.innerWidth-190)+'px';
+    ctxEl.style.top=Math.min(y, window.innerHeight- ctxEl.offsetHeight - 8)+'px';
+    ctxEl.classList.remove('hidden'); ctxEl.setAttribute('aria-hidden','false');
+    // ensure visible after layout
+    requestAnimationFrame(()=>{
+      if(ctxEl.offsetHeight){
+        if(y + ctxEl.offsetHeight > window.innerHeight) ctxEl.style.top=(window.innerHeight - ctxEl.offsetHeight - 8)+'px';
+        if(x + ctxEl.offsetWidth > window.innerWidth) ctxEl.style.left=(window.innerWidth - ctxEl.offsetWidth - 8)+'px';
+      }
+    });
+  }
+  document.addEventListener('click', e=>{
+    if(ctxEl && !ctxEl.contains(e.target) && !e.target.closest('.ctx')) hideCtx();
+  });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideCtx(); });
+  window.addEventListener('resize', hideCtx);
+  window.addEventListener('scroll', hideCtx, true);
+
+  function findEntryByName(name){
+    return entries.find(e=>e.name===name) || null;
+  }
+  // global context menu handler for files view
+  document.addEventListener('contextmenu', async e=>{
+    const filesView = $('#view-files');
+    if(!filesView || !filesView.classList.contains('is-active')) return; // only in files view
+    // allow default inside inputs
+    if(e.target.closest('input, textarea, select, button')) return;
+    const card = e.target.closest('.file-card');
+    const row = e.target.closest('#fileListBody tr');
+    let targetEnt=null;
+    let targetEl=null;
+    if(card){
+      const name=card.dataset.name; targetEnt=findEntryByName(name); targetEl=card;
+    } else if(row){
+      const name=row.dataset.name; targetEnt=findEntryByName(name); targetEl=row;
+    }
+    if(targetEnt){
+      e.preventDefault();
+      const isDir=targetEnt.dir;
+      const items=[];
+      items.push({label: targetEnt.name, isLabel:true});
+      if(!isDir){
+        items.push({label:'Download', action:()=> doDownload(targetEnt)});
+      } else {
+        items.push({label:'Open', action:()=> loadPath(joinPath(curPath, targetEnt.name))});
+      }
+      items.push({label:'Rename', action:()=> doRename(targetEnt)});
+      items.push({label:'Move…', action:()=> doMove(targetEnt)});
+      items.push({sep:true});
+      items.push({label:'Delete', danger:true, action:()=> doDelete(targetEnt)});
+      showCtx(e.clientX, e.clientY, items);
+    } else {
+      // empty space in files view (grid, list wrap, or view itself)
+      const insideFiles = e.target.closest('#fileGrid, #fileListWrap, #view-files');
+      if(insideFiles){
+        e.preventDefault();
+        const items=[
+          {label: 'Current folder: '+curPath, isLabel:true},
+          {label:'New folder', action: async ()=>{
+            const name=await openModal({title:'New folder',msg:'Create a folder in '+curPath,showInput:true,placeholder:'Folder name',okText:'Create'});
+            if(name===false) return; const n=String(name).trim(); if(!n){ toast('Enter a name','warn'); return; }
+            if(n.includes('/')){ toast('Name cannot contain /','error'); return; }
+            const r=await apiPostForm('/api/mkdir',{path:joinPath(curPath, n)});
+            if(r.ok){ toast('Folder created'); loadPath(curPath);} else toast(r.error||'Create failed','error');
+          }},
+          {label:'Refresh', action:()=> loadPath(curPath)},
+          {label:'Upload files…', action:()=> { const inp=$('#fileInput'); if(inp) inp.click(); }},
+        ];
+        // if not root, offer Up
+        if(curPath!=='/') items.splice(2,0,{label:'Go to parent', action:()=> loadPath(parentPath(curPath))});
+        showCtx(e.clientX, e.clientY, items);
+      }
+    }
+  });
+
+  // suppress default browser context menu on main files area? handled above
 
   // --- Upload (XHR for progress) ---
   const queue=[]; let uploading=false;

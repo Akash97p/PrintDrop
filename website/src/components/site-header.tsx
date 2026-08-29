@@ -23,6 +23,7 @@ const NAV_LINKS = [
   { href: "/#inside", label: "Inside" },
   { href: "/#performance", label: "Performance" },
   { href: "/devices", label: "Devices" },
+  { href: "/flash", label: "Flash Firmware" },
   { href: "/#docs", label: "Docs" },
 ]
 

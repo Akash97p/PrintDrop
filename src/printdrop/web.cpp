@@ -290,13 +290,18 @@ void handleDelete() {
     if (!safePath(server.arg("path"), path)) return sendError(400, "Invalid path");
     if (path == "/") return sendError(400, "Refusing to delete the card root");
 
-    storage::Guard g(true);
-    if (!g.ok()) return sendError(503, "Card busy");
-    if (!SD_FS.exists(path)) return sendError(404, "No such file");
+    {
+        storage::Guard g(true);
+        if (!g.ok()) return sendError(503, "Card busy");
+        if (!SD_FS.exists(path)) return sendError(404, "No such file");
 
-    removeRecursive(path);
-    if (SD_FS.exists(path)) return sendError(500, "Delete failed");
-    log("[web] deleted %s", path.c_str());
+        removeRecursive(path);
+        if (SD_FS.exists(path)) return sendError(500, "Delete failed");
+        log("[web] deleted %s", path.c_str());
+    }
+    // Auto-refresh printer view so the printer re-reads the FAT without
+    // requiring the user to press Eject/refresh manually.
+    storage::refreshHostView();
     sendOk();
 }
 
@@ -306,10 +311,13 @@ void handleMkdir() {
     if (!safePath(server.arg("path"), path)) return sendError(400, "Invalid path");
     if (path == "/") return sendError(400, "Invalid folder name");
 
-    storage::Guard g(true);
-    if (!g.ok()) return sendError(503, "Card busy");
-    if (SD_FS.exists(path)) return sendError(409, "Already exists");
-    if (!SD_FS.mkdir(path)) return sendError(500, "Could not create folder");
+    {
+        storage::Guard g(true);
+        if (!g.ok()) return sendError(503, "Card busy");
+        if (SD_FS.exists(path)) return sendError(409, "Already exists");
+        if (!SD_FS.mkdir(path)) return sendError(500, "Could not create folder");
+    }
+    storage::refreshHostView();
     sendOk();
 }
 
@@ -321,11 +329,14 @@ void handleRename() {
     }
     if (from == "/" || to == "/") return sendError(400, "Invalid path");
 
-    storage::Guard g(true);
-    if (!g.ok()) return sendError(503, "Card busy");
-    if (!SD_FS.exists(from)) return sendError(404, "No such file");
-    if (SD_FS.exists(to))    return sendError(409, "Target already exists");
-    if (!SD_FS.rename(from, to)) return sendError(500, "Rename failed");
+    {
+        storage::Guard g(true);
+        if (!g.ok()) return sendError(503, "Card busy");
+        if (!SD_FS.exists(from)) return sendError(404, "No such file");
+        if (SD_FS.exists(to))    return sendError(409, "Target already exists");
+        if (!SD_FS.rename(from, to)) return sendError(500, "Rename failed");
+    }
+    storage::refreshHostView();
     sendOk();
 }
 
@@ -437,7 +448,15 @@ void handleUploadDone() {
     if (!uploadError.isEmpty()) return sendError(500, uploadError);
     String j = "{\"ok\":true,\"name\":\"" + jsonEscape(uploadName) + "\",";
     j += "\"size\":" + String((uint32_t)uploadBytes) + "}";
+    // Upload already withdrew the media via storage::lock(true) for the
+    // duration of the write and re-presented it on unlock.  Force an
+    // additional 1.5 s offline pulse so hosts that missed the first
+    // transition (tiny files) still re-read the FAT. This is what makes
+    // the printer show the new file without manual Eject.
+    // Send the JSON first so the client sees progress immediately; the
+    // 1.5 s pulse still blocks the web task but the response is already out.
     sendJson(200, j);
+    storage::refreshHostView();
 }
 
 // --- API: Wi-Fi ------------------------------------------------------------

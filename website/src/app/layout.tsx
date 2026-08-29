@@ -7,7 +7,8 @@ import { SiteHeader } from "@/components/site-header"
 
 import "./globals.css"
 
-const siteUrl = process.env.NEXT_SITE_URL ?? "https://akash97p.github.io/PrintDrop/"
+const siteUrl =
+  process.env.NEXT_SITE_URL ?? "https://kabani-tech.github.io/PrintDrop/"
 
 // Must mirror the basePath logic in next.config.ts: metadata icon paths are
 // emitted verbatim, so they have to carry the repository subpath themselves.

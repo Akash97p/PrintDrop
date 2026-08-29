@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 
-const GITHUB_URL = "https://github.com/Akash97p/PrintDrop"
+const GITHUB_URL = "https://github.com/Kabani-Tech/PrintDrop"
 
 const STATS = [
   { value: "~3 200", label: "KB/s card read — SDIO" },

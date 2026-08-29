@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-const GITHUB_REPO = "Akash97p/PrintDrop";
+const GITHUB_REPO = "Kabani-Tech/PrintDrop";
 const GITHUB_RELEASES = `https://github.com/${GITHUB_REPO}/releases`;
 const GITHUB_API_LATEST = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 

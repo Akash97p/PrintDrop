@@ -2,7 +2,7 @@ import Link from "next/link"
 
 import { Separator } from "@/components/ui/separator"
 
-const GITHUB_URL = "https://github.com/Akash97p/PrintDrop"
+const GITHUB_URL = "https://github.com/Kabani-Tech/PrintDrop"
 
 const FOOTER_LINKS = [
   { href: "/docs/", label: "Docs" },

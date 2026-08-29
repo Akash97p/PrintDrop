@@ -15,7 +15,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 
-const GITHUB_URL = "https://github.com/Akash97p/PrintDrop"
+const GITHUB_URL = "https://github.com/Kabani-Tech/PrintDrop"
 
 const NAV_LINKS = [
   { href: "/#why", label: "Why" },

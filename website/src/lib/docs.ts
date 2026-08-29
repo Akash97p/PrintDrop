@@ -96,7 +96,7 @@ export type RenderedDoc = DocDefinition & {
   sourceUrl: string
 }
 
-const repositoryUrl = "https://github.com/Akash97p/PrintDrop"
+const repositoryUrl = "https://github.com/Kabani-Tech/PrintDrop"
 const repoRoot = path.resolve(process.cwd(), "..")
 const sourceToSlug = new Map(docs.map((doc) => [doc.source, doc.slug]))
 

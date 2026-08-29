@@ -2,7 +2,6 @@ import Link from "next/link"
 import {
   Activity,
   ArrowRight,
-  ArrowUpRight,
   Cable,
   Cpu,
   FileText,
@@ -30,7 +29,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 
 const GITHUB_URL = "https://github.com/Akash97p/PrintDrop"
-const REPO = "https://github.com/Akash97p/PrintDrop/blob/main"
 
 const STATS = [
   { value: "~3 200", label: "KB/s card read — SDIO" },
@@ -151,52 +149,52 @@ const UX = [
 
 const DOCS = [
   {
-    href: `${GITHUB_URL}#readme`,
+    href: "/docs/getting-started/",
     title: "Getting started",
     description: "Hardware, wiring, flashing and first run",
   },
   {
-    href: `${REPO}/docs/architecture.md`,
+    href: "/docs/architecture/",
     title: "Architecture",
     description: "How USB and Wi-Fi share one card",
   },
   {
-    href: `${REPO}/docs/hardware.md`,
+    href: "/docs/hardware/",
     title: "Hardware",
     description: "The board as measured, wiring and power",
   },
   {
-    href: `${REPO}/docs/sdio.md`,
+    href: "/docs/sdio/",
     title: "SDIO 4-bit",
     description: "6-wire migration, 6 s vs 80 s uploads",
   },
   {
-    href: `${REPO}/docs/auth.md`,
+    href: "/docs/authentication/",
     title: "Authentication",
     description: "HTTP Basic, SHA-256 NVS, Basic header",
   },
   {
-    href: `${REPO}/docs/discovery.md`,
+    href: "/docs/discovery/",
     title: "Discovery",
     description: "mDNS + LLMNR, printdrop.local / printdrop",
   },
   {
-    href: `${REPO}/docs/ota.md`,
+    href: "/docs/ota/",
     title: "OTA update",
     description: "Dual 1 344 KB slots, HTTP + SD card",
   },
   {
-    href: `${REPO}/docs/bugs.md`,
+    href: "/docs/bugs/",
     title: "Bugs found",
     description: "Every fault hit during the port, and why",
   },
   {
-    href: `${REPO}/docs/flashing.md`,
+    href: "/docs/flashing/",
     title: "Flashing",
     description: "Download mode on this board",
   },
   {
-    href: `${GITHUB_URL}/blob/main/CONTRIBUTING.md`,
+    href: "/docs/contributing/",
     title: "Contributing",
     description: "Build setup, branch model, what to test",
   },
@@ -536,7 +534,7 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between gap-2">
                     {doc.title}
-                    <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </CardTitle>
                   <CardDescription className="leading-6">
                     {doc.description}
@@ -562,9 +560,9 @@ export default function Home() {
           </CardHeader>
           <CardContent className="flex flex-wrap justify-center gap-3 px-6">
             <Button variant="secondary" asChild>
-              <a href={DOCS[0].href} target="_blank" rel="noopener">
+              <Link href={DOCS[0].href}>
                 Getting started
-              </a>
+              </Link>
             </Button>
             <Button
               variant="outline"

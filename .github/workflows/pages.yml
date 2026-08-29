@@ -2,11 +2,14 @@ name: Documentation site
 
 on:
   push:
-    # Validate the site on feature branches (feat/sdio) without deploying;
-    # deploy only happens from main (see deploy job condition).
-    branches: [main, "feat/**", "feature/**"]
+    # Validate the site on dev and feature branches without deploying; deploy
+    # only happens from main (see deploy job condition).
+    branches: [main, dev, "feat/**", "feature/**"]
     paths:
       - "website/**"
+      - "docs/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
       - "assets/printdrop_banner.webp"
       - "data/logo.webp"
       - "scripts/build-site.sh"

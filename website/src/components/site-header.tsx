@@ -24,7 +24,7 @@ const NAV_LINKS = [
   { href: "/#performance", label: "Performance" },
   { href: "/devices", label: "Devices" },
   { href: "/flash", label: "Flash Firmware" },
-  { href: "/#docs", label: "Docs" },
+  { href: "/docs/", label: "Docs" },
 ]
 
 export function SiteHeader() {

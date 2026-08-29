@@ -5,8 +5,8 @@ import { Separator } from "@/components/ui/separator"
 const GITHUB_URL = "https://github.com/Akash97p/PrintDrop"
 
 const FOOTER_LINKS = [
-  { href: "https://github.com/Akash97p/PrintDrop#readme", label: "Docs" },
-  { href: "https://github.com/Akash97p/PrintDrop/blob/main/CONTRIBUTING.md", label: "Contributing" },
+  { href: "/docs/", label: "Docs" },
+  { href: "/docs/contributing/", label: "Contributing" },
   { href: GITHUB_URL, label: "Source" },
 ]
 
